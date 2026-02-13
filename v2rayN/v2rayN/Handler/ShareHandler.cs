@@ -896,6 +896,14 @@ namespace v2rayN.Handler
             {
                 dicQuery["alpn"] = Utils.UrlEncode(Utils.List2String(item.alpn));
             }
+            if (!Utils.IsNullOrEmpty(item.fingerprint))
+            {
+                dicQuery["fingerprint"] = item.fingerprint;
+            }
+            if (!Utils.IsNullOrEmpty(item.certSha256))
+            {
+                dicQuery["certSha256"] = item.certSha256;
+            }
 
             string query = dicQuery.Count > 0 ? "?" + string.Join("&", dicQuery.Select(x => x.Key + "=" + x.Value).ToArray()) : "";
 
@@ -925,6 +933,8 @@ namespace v2rayN.Handler
             item.streamSecurity = query["security"] ?? "";
             item.sni = query["sni"] ?? "";
             item.alpn = Utils.String2List(Utils.UrlDecode(query["alpn"] ?? ""));
+            item.fingerprint = query["fingerprint"] ?? "";
+            item.certSha256 = query["certSha256"] ?? "";
 
             return item;
         }
@@ -990,6 +1000,7 @@ namespace v2rayN.Handler
             item.alpn = Utils.String2List(Utils.UrlDecode(query["alpn"] ?? ""));
             item.fingerprint = query["fingerprint"] ?? "";
             item.certSha256 = query["certSha256"] ?? "";
+            item.ech = query["ech"] ?? "";
 
             return item;
         }
