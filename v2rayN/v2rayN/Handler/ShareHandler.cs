@@ -169,11 +169,11 @@ namespace v2rayN.Handler
             }
 
             var dicQuery = new Dictionary<string, string>();
-            if (item.upMbps > 0)
+            if (item.upMbps != null && item.upMbps > 0)
             {
                 dicQuery["upmbps"] = item.upMbps.ToString();
             }
-            if (item.downMbps > 0)
+            if (item.downMbps != null && item.downMbps > 0)
             {
                 dicQuery["downmbps"] = item.downMbps.ToString();
             }
@@ -850,7 +850,7 @@ namespace v2rayN.Handler
                 configType = EConfigType.Hysteria2
             };
 
-            Uri url = new Uri(result);
+            Uri url = new Uri(result.Replace("hysteria2://", "https://", StringComparison.OrdinalIgnoreCase));
 
             item.address = url.IdnHost;
             item.port = url.Port;
@@ -922,7 +922,7 @@ namespace v2rayN.Handler
                 configType = EConfigType.Mieru
             };
 
-            Uri url = new Uri(result);
+            Uri url = new Uri(result.Replace("mieru://", "https://", StringComparison.OrdinalIgnoreCase));
 
             item.address = url.IdnHost;
             item.port = url.Port;
@@ -987,7 +987,7 @@ namespace v2rayN.Handler
                 configType = EConfigType.TUIC
             };
 
-            Uri url = new Uri(result);
+            Uri url = new Uri(result.Replace("tuic://", "https://", StringComparison.OrdinalIgnoreCase));
 
             item.address = url.IdnHost;
             item.port = url.Port;
