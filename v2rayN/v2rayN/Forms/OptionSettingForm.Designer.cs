@@ -55,10 +55,10 @@ namespace v2rayN.Forms
             this.linkDnsObjectDoc = new System.Windows.Forms.LinkLabel();
             this.txtremoteDNS = new System.Windows.Forms.TextBox();
             this.label14 = new System.Windows.Forms.Label();
-            this.labelDnsHosts = new System.Windows.Forms.Label();
             this.txtDnsHosts = new System.Windows.Forms.TextBox();
-            this.labelFakeDNS = new System.Windows.Forms.Label();
+            this.labelDnsHosts = new System.Windows.Forms.Label();
             this.txtFakeDNS = new System.Windows.Forms.TextBox();
+            this.labelFakeDNS = new System.Windows.Forms.Label();
             this.chkEnableFakeDNS = new System.Windows.Forms.CheckBox();
             this.tabPage6 = new System.Windows.Forms.TabPage();
             this.chkKcpcongestion = new System.Windows.Forms.CheckBox();
@@ -277,11 +277,11 @@ namespace v2rayN.Forms
             // 
             // tabPage2
             // 
-            this.tabPage2.Controls.Add(this.chkEnableFakeDNS);
-            this.tabPage2.Controls.Add(this.txtFakeDNS);
-            this.tabPage2.Controls.Add(this.labelFakeDNS);
-            this.tabPage2.Controls.Add(this.txtDnsHosts);
             this.tabPage2.Controls.Add(this.labelDnsHosts);
+            this.tabPage2.Controls.Add(this.txtDnsHosts);
+            this.tabPage2.Controls.Add(this.labelFakeDNS);
+            this.tabPage2.Controls.Add(this.txtFakeDNS);
+            this.tabPage2.Controls.Add(this.chkEnableFakeDNS);
             this.tabPage2.Controls.Add(this.cmbdomainStrategy4Freedom);
             this.tabPage2.Controls.Add(this.label19);
             this.tabPage2.Controls.Add(this.linkDnsObjectDoc);
@@ -327,36 +327,37 @@ namespace v2rayN.Forms
             // 
             // labelDnsHosts
             // 
+            this.labelDnsHosts.Location = new System.Drawing.Point(15, 15);
             this.labelDnsHosts.Name = "labelDnsHosts";
-            this.labelDnsHosts.Text = "DNS Hosts:";
-            this.labelDnsHosts.Location = new System.Drawing.Point(30, 10);
             this.labelDnsHosts.Size = new System.Drawing.Size(80, 20);
+            this.labelDnsHosts.Text = "DNS Hosts:";
             // 
             // txtDnsHosts
             // 
-            this.txtDnsHosts.Location = new System.Drawing.Point(120, 7);
-            this.txtDnsHosts.Size = new System.Drawing.Size(350, 20);
+            this.txtDnsHosts.Location = new System.Drawing.Point(100, 12);
             this.txtDnsHosts.Name = "txtDnsHosts";
+            this.txtDnsHosts.Size = new System.Drawing.Size(350, 20);
             // 
             // labelFakeDNS
             // 
+            this.labelFakeDNS.Location = new System.Drawing.Point(15, 45);
             this.labelFakeDNS.Name = "labelFakeDNS";
-            this.labelFakeDNS.Text = "FakeIP:";
-            this.labelFakeDNS.Location = new System.Drawing.Point(30, 40);
             this.labelFakeDNS.Size = new System.Drawing.Size(80, 20);
+            this.labelFakeDNS.Text = "FakeIP:";
             // 
             // txtFakeDNS
             // 
-            this.txtFakeDNS.Location = new System.Drawing.Point(120, 37);
-            this.txtFakeDNS.Size = new System.Drawing.Size(350, 20);
+            this.txtFakeDNS.Location = new System.Drawing.Point(100, 42);
             this.txtFakeDNS.Name = "txtFakeDNS";
+            this.txtFakeDNS.Size = new System.Drawing.Size(350, 20);
             // 
             // chkEnableFakeDNS
             // 
+            this.chkEnableFakeDNS.AutoSize = true;
+            this.chkEnableFakeDNS.Location = new System.Drawing.Point(100, 68);
             this.chkEnableFakeDNS.Name = "chkEnableFakeDNS";
+            this.chkEnableFakeDNS.Size = new System.Drawing.Size(100, 16);
             this.chkEnableFakeDNS.Text = "Enable FakeIP";
-            this.chkEnableFakeDNS.Location = new System.Drawing.Point(120, 65);
-            this.chkEnableFakeDNS.Size = new System.Drawing.Size(120, 20);
             // 
             // tabPage6
             // 
