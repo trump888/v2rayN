@@ -55,6 +55,7 @@ namespace v2rayN.Forms
             this.linkDnsObjectDoc = new System.Windows.Forms.LinkLabel();
             this.txtremoteDNS = new System.Windows.Forms.TextBox();
             this.label14 = new System.Windows.Forms.Label();
+            this.panDnsSettings = new System.Windows.Forms.Panel();
             this.txtDnsHosts = new System.Windows.Forms.TextBox();
             this.labelDnsHosts = new System.Windows.Forms.Label();
             this.txtFakeDNS = new System.Windows.Forms.TextBox();
@@ -282,6 +283,7 @@ namespace v2rayN.Forms
             this.tabPage2.Controls.Add(this.labelFakeDNS);
             this.tabPage2.Controls.Add(this.txtFakeDNS);
             this.tabPage2.Controls.Add(this.chkEnableFakeDNS);
+            this.tabPage2.Controls.Add(this.panDnsSettings);
             this.tabPage2.Controls.Add(this.cmbdomainStrategy4Freedom);
             this.tabPage2.Controls.Add(this.label19);
             this.tabPage2.Controls.Add(this.linkDnsObjectDoc);
@@ -325,36 +327,47 @@ namespace v2rayN.Forms
             resources.ApplyResources(this.label14, "label14");
             this.label14.Name = "label14";
             // 
+            // panDnsSettings
+            // 
+            this.panDnsSettings.Controls.Add(this.labelDnsHosts);
+            this.panDnsSettings.Controls.Add(this.txtDnsHosts);
+            this.panDnsSettings.Controls.Add(this.labelFakeDNS);
+            this.panDnsSettings.Controls.Add(this.txtFakeDNS);
+            this.panDnsSettings.Controls.Add(this.chkEnableFakeDNS);
+            this.panDnsSettings.Location = new System.Drawing.Point(15, 15);
+            this.panDnsSettings.Name = "panDnsSettings";
+            this.panDnsSettings.Size = new System.Drawing.Size(480, 100);
+            // 
             // labelDnsHosts
             // 
-            this.labelDnsHosts.Location = new System.Drawing.Point(15, 15);
+            this.labelDnsHosts.Location = new System.Drawing.Point(10, 10);
             this.labelDnsHosts.Name = "labelDnsHosts";
             this.labelDnsHosts.Size = new System.Drawing.Size(80, 20);
             this.labelDnsHosts.Text = "DNS Hosts:";
             // 
             // txtDnsHosts
             // 
-            this.txtDnsHosts.Location = new System.Drawing.Point(100, 12);
+            this.txtDnsHosts.Location = new System.Drawing.Point(95, 7);
             this.txtDnsHosts.Name = "txtDnsHosts";
             this.txtDnsHosts.Size = new System.Drawing.Size(350, 20);
             // 
             // labelFakeDNS
             // 
-            this.labelFakeDNS.Location = new System.Drawing.Point(15, 45);
+            this.labelFakeDNS.Location = new System.Drawing.Point(10, 40);
             this.labelFakeDNS.Name = "labelFakeDNS";
             this.labelFakeDNS.Size = new System.Drawing.Size(80, 20);
             this.labelFakeDNS.Text = "FakeIP:";
             // 
             // txtFakeDNS
             // 
-            this.txtFakeDNS.Location = new System.Drawing.Point(100, 42);
+            this.txtFakeDNS.Location = new System.Drawing.Point(95, 37);
             this.txtFakeDNS.Name = "txtFakeDNS";
             this.txtFakeDNS.Size = new System.Drawing.Size(350, 20);
             // 
             // chkEnableFakeDNS
             // 
             this.chkEnableFakeDNS.AutoSize = true;
-            this.chkEnableFakeDNS.Location = new System.Drawing.Point(100, 68);
+            this.chkEnableFakeDNS.Location = new System.Drawing.Point(95, 65);
             this.chkEnableFakeDNS.Name = "chkEnableFakeDNS";
             this.chkEnableFakeDNS.Size = new System.Drawing.Size(100, 16);
             this.chkEnableFakeDNS.Text = "Enable FakeIP";
@@ -789,6 +802,7 @@ namespace v2rayN.Forms
         private System.Windows.Forms.TextBox txtFakeDNS;
         private System.Windows.Forms.Label labelFakeDNS;
         private System.Windows.Forms.CheckBox chkEnableFakeDNS;
+        private System.Windows.Forms.Panel panDnsSettings;
         private System.Windows.Forms.CheckBox chkIgnoreGeoUpdateCore;
         private System.Windows.Forms.TabPage tabPage3;
         private System.Windows.Forms.TextBox txtsystemProxyExceptions;
