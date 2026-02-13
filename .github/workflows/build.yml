@@ -1,0 +1,33 @@
+name: Build v2rayN
+
+on:
+  push:
+    branches: [mod-5.39]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: mod-5.39
+        fetch-depth: 0
+
+    - name: Setup MSBuild
+      uses: microsoft/setup-msbuild@v2
+
+    - name: Restore NuGet packages
+      run: |
+        nuget restore v2rayN/v2rayN.sln
+
+    - name: Build Solution
+      run: |
+        msbuild v2rayN/v2rayN.sln /p:Configuration=Release /p:Platform="Any CPU"
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: v2rayN-build
+        path: v2rayN/v2rayN/bin/Release/
