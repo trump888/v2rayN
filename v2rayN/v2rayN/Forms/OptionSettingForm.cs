@@ -20,11 +20,12 @@ namespace v2rayN.Forms
         public OptionSettingForm()
         {
             InitializeComponent();
-            AddDnsControls();
         }
 
         private void AddDnsControls()
         {
+            if (txtDnsHosts != null) return;
+
             lblDnsHosts = new Label();
             lblDnsHosts.Text = "DNS Hosts:";
             lblDnsHosts.Location = new System.Drawing.Point(15, 150);
@@ -55,6 +56,7 @@ namespace v2rayN.Forms
 
         private void OptionSettingForm_Load(object sender, EventArgs e)
         {
+            AddDnsControls();
             cmbSystemProxyAdvancedProtocol.Items.AddRange(Global.IEProxyProtocols.ToArray());
             cmbdomainStrategy4Freedom.Items.Clear();
             cmbdomainStrategy4Freedom.Items.AddRange(Global.domainStrategy4Freedoms.ToArray());
