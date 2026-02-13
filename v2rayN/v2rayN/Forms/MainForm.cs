@@ -1049,11 +1049,20 @@ namespace v2rayN.Forms
         private void menuAddServers_Click(object sender, EventArgs e)
         {
             string clipboardData = Utils.GetClipboardData();
+            if (string.IsNullOrEmpty(clipboardData))
+            {
+                UI.Show(ResUI.FailedReadConfiguration);
+                return;
+            }
             int ret = ConfigHandler.AddBatchServers(ref config, clipboardData, "", _groupId);
             if (ret > 0)
             {
                 RefreshServers();
                 UI.Show(string.Format(ResUI.SuccessfullyImportedServerViaClipboard, ret));
+            }
+            else
+            {
+                UI.Show(ResUI.NonvmessOrssProtocol);
             }
         }
 
