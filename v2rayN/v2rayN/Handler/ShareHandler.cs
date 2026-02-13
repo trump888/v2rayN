@@ -331,6 +331,22 @@ namespace v2rayN.Handler
             {
                 dicQuery.Add("alpn", Utils.UrlEncode(Utils.List2String(item.alpn)));
             }
+            if (!Utils.IsNullOrEmpty(item.fingerprint))
+            {
+                dicQuery.Add("fingerprint", item.fingerprint);
+            }
+            if (!Utils.IsNullOrEmpty(item.certSha256))
+            {
+                dicQuery.Add("certSha256", item.certSha256);
+            }
+            if (!Utils.IsNullOrEmpty(item.ech))
+            {
+                dicQuery.Add("ech", item.ech);
+            }
+            if (!Utils.IsNullOrEmpty(item.allowInsecure))
+            {
+                dicQuery.Add("insecure", item.allowInsecure);
+            }
 
             dicQuery.Add("type", !Utils.IsNullOrEmpty(item.network) ? item.network : "tcp");
 
@@ -994,6 +1010,11 @@ namespace v2rayN.Handler
             item.alpn = Utils.String2List(Utils.UrlDecode(query["alpn"] ?? ""));
             item.fingerprint = query["fingerprint"] ?? "";
             item.certSha256 = query["certSha256"] ?? "";
+            item.ech = query["ech"] ?? "";
+            if (query["insecure"] != null)
+            {
+                item.allowInsecure = query["insecure"];
+            }
 
             return item;
         }
@@ -1028,6 +1049,14 @@ namespace v2rayN.Handler
             {
                 dicQuery["certSha256"] = item.certSha256;
             }
+            if (!Utils.IsNullOrEmpty(item.ech))
+            {
+                dicQuery["ech"] = item.ech;
+            }
+            if (!Utils.IsNullOrEmpty(item.allowInsecure))
+            {
+                dicQuery["insecure"] = item.allowInsecure;
+            }
 
             string query = dicQuery.Count > 0 ? "?" + string.Join("&", dicQuery.Select(x => x.Key + "=" + x.Value).ToArray()) : "";
 
@@ -1061,6 +1090,10 @@ namespace v2rayN.Handler
             item.fingerprint = query["fingerprint"] ?? "";
             item.certSha256 = query["certSha256"] ?? "";
             item.ech = query["ech"] ?? "";
+            if (query["insecure"] != null)
+            {
+                item.allowInsecure = query["insecure"];
+            }
 
             return item;
         }
@@ -1072,6 +1105,13 @@ namespace v2rayN.Handler
             item.sni = query["sni"] ?? "";
             item.alpn = Utils.String2List(Utils.UrlDecode(query["alpn"] ?? ""));
             item.network = query["type"] ?? "tcp";
+            item.fingerprint = query["fingerprint"] ?? "";
+            item.certSha256 = query["certSha256"] ?? "";
+            item.ech = query["ech"] ?? "";
+            if (query["insecure"] != null)
+            {
+                item.allowInsecure = query["insecure"];
+            }
             switch (item.network)
             {
                 case "tcp":
