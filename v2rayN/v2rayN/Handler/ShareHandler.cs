@@ -487,24 +487,48 @@ namespace v2rayN.Handler
                     msg = ResUI.ConfigurationFormatIncorrect;
 
                     vmessItem = ResolveTrojan(result);
+                    if (vmessItem == null)
+                    {
+                        return null;
+                    }
                 }
                 else if (result.StartsWith(Global.vlessProtocol))
                 {
                     vmessItem = ResolveStdVLESS(result);
+                    if (vmessItem == null)
+                    {
+                        msg = ResUI.ConfigurationFormatIncorrect;
+                        return null;
+                    }
 
                     ConfigHandler.UpgradeServerVersion(ref vmessItem);
                 }
                 else if (result.StartsWith(Global.hysteria2Protocol))
                 {
                     vmessItem = ResolveHysteria2(result);
+                    if (vmessItem == null)
+                    {
+                        msg = ResUI.ConfigurationFormatIncorrect;
+                        return null;
+                    }
                 }
                 else if (result.StartsWith(Global.mieruProtocol))
                 {
                     vmessItem = ResolveMieru(result);
+                    if (vmessItem == null)
+                    {
+                        msg = ResUI.ConfigurationFormatIncorrect;
+                        return null;
+                    }
                 }
                 else if (result.StartsWith(Global.tuicProtocol))
                 {
                     vmessItem = ResolveTuic(result);
+                    if (vmessItem == null)
+                    {
+                        msg = ResUI.ConfigurationFormatIncorrect;
+                        return null;
+                    }
                 }
                 else
                 {
