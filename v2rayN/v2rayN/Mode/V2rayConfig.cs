@@ -341,6 +341,10 @@ namespace v2rayN.Mode
         /// DNS Hosts
         /// </summary>
         public Dictionary<string, string> hosts { get; set; }
+        /// <summary>
+        /// FakeDNS IP ranges
+        /// </summary>
+        public List<string> fakeDns { get; set; }
     }
 
     public class Routing

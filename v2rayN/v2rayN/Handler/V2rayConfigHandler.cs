@@ -852,7 +852,9 @@ namespace v2rayN.Handler
                     v2rayConfig.dns = new Mode.Dns
                     {
                         servers = servers,
-                        hosts = ParseHostsToDictionary(config.dnsHosts)
+                        hosts = ParseHostsToDictionary(config.dnsHosts),
+                        fakeDns = config.enableFakeDNS && !Utils.IsNullOrEmpty(config.fakeDNS) 
+                            ? Utils.String2List(config.fakeDNS) : null
                     };
                 }
             }

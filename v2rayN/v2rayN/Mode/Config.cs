@@ -101,6 +101,14 @@ namespace v2rayN.Mode
         }
 
         /// <summary>
+        /// FakeDNS IP ranges
+        /// </summary>
+        public string fakeDNS
+        {
+            get; set;
+        }
+
+        /// <summary>
         /// Outbound Freedom domainStrategy
         /// </summary>
         public string domainStrategy4Freedom
