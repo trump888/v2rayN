@@ -291,6 +291,23 @@ namespace v2rayN.Mode
         /// 
         /// </summary>
         public List<SocksUsersItem> users { get; set; }
+
+        /// <summary>
+        /// hysteria2
+        /// </summary>
+        public int? upMbps { get; set; }
+        /// <summary>
+        /// hysteria2
+        /// </summary>
+        public int? downMbps { get; set; }
+        /// <summary>
+        /// hysteria2
+        /// </summary>
+        public string obfs { get; set; }
+        /// <summary>
+        /// hysteria2
+        /// </summary>
+        public string obfsPassword { get; set; }
     }
 
     public class SocksUsersItem
@@ -435,6 +452,16 @@ namespace v2rayN.Mode
         /// "chrome" | "firefox" | "safari" | "randomized"
         /// </summary>
         public string fingerprint { get; set; }
+
+        /// <summary>
+        /// cert sha256 fingerprint
+        /// </summary>
+        public string fingerprint0 { get; set; }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        public string certSha256 { get; set; }
 
     }
 

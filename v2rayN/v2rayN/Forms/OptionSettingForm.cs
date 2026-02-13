@@ -60,7 +60,6 @@ namespace v2rayN.Forms
             txtDnsHosts.Text = config.dnsHosts ?? "";
             txtFakeDNS.Text = config.fakeDNS ?? "";
             chkEnableFakeDNS.Checked = config.enableFakeDNS;
-            chkEnableFakeDNS.Checked = config.enableFakeDNS;
 
             chkdefAllowInsecure.Checked = config.defAllowInsecure;
 
@@ -237,7 +236,6 @@ namespace v2rayN.Forms
             config.remoteDNS = txtremoteDNS.Text.TrimEx();
             config.dnsHosts = txtDnsHosts.Text.TrimEx();
             config.fakeDNS = txtFakeDNS.Text.TrimEx();
-            config.enableFakeDNS = chkEnableFakeDNS.Checked;
             config.enableFakeDNS = chkEnableFakeDNS.Checked;
 
             config.defAllowInsecure = chkdefAllowInsecure.Checked;

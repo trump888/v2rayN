@@ -593,6 +593,11 @@ namespace v2rayN.Handler
                     serversItem.ota = false;
                     serversItem.level = 1;
 
+                    serversItem.upMbps = node.upMbps;
+                    serversItem.downMbps = node.downMbps;
+                    serversItem.obfs = node.obfs;
+                    serversItem.obfsPassword = node.obfsPassword;
+
                     boundStreamSettings(node, "out", outbound.streamSettings);
 
                     outbound.protocol = "hysteria2";
@@ -678,7 +683,9 @@ namespace v2rayN.Handler
                     {
                         allowInsecure = Utils.ToBool(node.allowInsecure),
                         alpn = node.GetAlpn(),
-                        fingerprint = node.fingerprint
+                        fingerprint = node.fingerprint,
+                        fingerprint0 = node.fingerprint,
+                        certSha256 = node.certSha256
                     };
                     if (!string.IsNullOrWhiteSpace(sni))
                     {
@@ -700,7 +707,9 @@ namespace v2rayN.Handler
                     {
                         allowInsecure = Utils.ToBool(node.allowInsecure),
                         alpn = node.GetAlpn(),
-                        fingerprint = node.fingerprint
+                        fingerprint = node.fingerprint,
+                        fingerprint0 = node.fingerprint,
+                        certSha256 = node.certSha256
                     };
                     if (!string.IsNullOrWhiteSpace(sni))
                     {
