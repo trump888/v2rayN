@@ -183,6 +183,10 @@ namespace v2rayN.Mode
         /// 
         /// </summary>
         public List<string> destOverride { get; set; }
+        /// <summary>
+        /// routeOnly
+        /// </summary>
+        public bool routeOnly { get; set; }
     }
 
     public class Outbounds
@@ -462,6 +466,41 @@ namespace v2rayN.Mode
         /// 
         /// </summary>
         public string certSha256 { get; set; }
+
+        /// <summary>
+        /// pinnedPeerCertSha256 - 替代 allowInsecure 的证书校验方式
+        /// </summary>
+        public string pinnedPeerCertSha256 { get; set; }
+
+        /// <summary>
+        /// disableSystemRoot
+        /// </summary>
+        public bool disableSystemRoot { get; set; }
+
+        /// <summary>
+        /// ECH Config List
+        /// </summary>
+        public string echConfigList { get; set; }
+
+        /// <summary>
+        /// ECH Force Query
+        /// </summary>
+        public bool echForceQuery { get; set; }
+
+        /// <summary>
+        /// publicKey for Reality
+        /// </summary>
+        public string publicKey { get; set; }
+
+        /// <summary>
+        /// shortId for Reality
+        /// </summary>
+        public string shortId { get; set; }
+
+        /// <summary>
+        /// spiderX for Reality
+        /// </summary>
+        public string spiderX { get; set; }
 
     }
 

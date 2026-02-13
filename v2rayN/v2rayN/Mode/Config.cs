@@ -117,9 +117,81 @@ namespace v2rayN.Mode
         }
 
         /// <summary>
+        /// Outbound Proxy domainStrategy
+        /// </summary>
+        public string domainStrategy4Proxy
+        {
+            get; set;
+        }
+
+        /// <summary>
         /// 是否允许不安全连接
         /// </summary>
         public bool defAllowInsecure
+        {
+            get; set;
+        }
+
+        /// <summary>
+        /// 默认TLS指纹
+        /// </summary>
+        public string defFingerprint
+        {
+            get; set;
+        }
+
+        /// <summary>
+        /// 默认User-Agent
+        /// </summary>
+        public string defUserAgent
+        {
+            get; set;
+        }
+
+        /// <summary>
+        /// 启用包碎片化
+        /// </summary>
+        public bool enableFragment
+        {
+            get; set;
+        }
+
+        /// <summary>
+        /// DNS ServeStale
+        /// </summary>
+        public bool? serveStale
+        {
+            get; set;
+        }
+
+        /// <summary>
+        /// DNS Parallel Query
+        /// </summary>
+        public bool? parallelQuery
+        {
+            get; set;
+        }
+
+        /// <summary>
+        /// Direct Expected IPs
+        /// </summary>
+        public string directExpectedIPs
+        {
+            get; set;
+        }
+
+        /// <summary>
+        /// 测速超时时间(毫秒)
+        /// </summary>
+        public int speedTestTimeout
+        {
+            get; set;
+        }
+
+        /// <summary>
+        /// 混合测速并发数
+        /// </summary>
+        public int mixedConcurrencyCount
         {
             get; set;
         }
@@ -648,7 +720,22 @@ namespace v2rayN.Mode
         /// </summary>
         public bool sniffingEnabled { get; set; } = true;
 
+        /// <summary>
+        /// 协议探测覆盖
+        /// </summary>
+        public List<string> destOverride { get; set; }
+
+        /// <summary>
+        /// 仅路由模式
+        /// </summary>
+        public bool routeOnly { get; set; }
+
         public bool allowLANConn { get; set; }
+
+        /// <summary>
+        /// 为LAN开启新端口
+        /// </summary>
+        public bool secondLocalPortEnabled { get; set; }
 
         public string user { get; set; }
 

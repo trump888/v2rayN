@@ -183,6 +183,11 @@ namespace v2rayN.Handler
             inbound.protocol = bSocks ? Global.InboundSocks : Global.InboundHttp;
             inbound.settings.udp = inItem.udpEnabled;
             inbound.sniffing.enabled = inItem.sniffingEnabled;
+            inbound.sniffing.routeOnly = inItem.routeOnly;
+            if (inItem.destOverride != null && inItem.destOverride.Count > 0)
+            {
+                inbound.sniffing.destOverride = inItem.destOverride;
+            }
 
             return inbound;
         }
@@ -687,6 +692,16 @@ namespace v2rayN.Handler
                         fingerprint0 = node.fingerprint,
                         certSha256 = node.certSha256
                     };
+                    if (!string.IsNullOrWhiteSpace(node.certSha256))
+                    {
+                        tlsSettings.pinnedPeerCertSha256 = node.certSha256;
+                        tlsSettings.allowInsecure = false;
+                    }
+                    if (!string.IsNullOrWhiteSpace(node.ech))
+                    {
+                        tlsSettings.echConfigList = node.ech;
+                        tlsSettings.echForceQuery = true;
+                    }
                     if (!string.IsNullOrWhiteSpace(sni))
                     {
                         tlsSettings.serverName = sni;
@@ -711,6 +726,16 @@ namespace v2rayN.Handler
                         fingerprint0 = node.fingerprint,
                         certSha256 = node.certSha256
                     };
+                    if (!string.IsNullOrWhiteSpace(node.certSha256))
+                    {
+                        xtlsSettings.pinnedPeerCertSha256 = node.certSha256;
+                        xtlsSettings.allowInsecure = false;
+                    }
+                    if (!string.IsNullOrWhiteSpace(node.ech))
+                    {
+                        xtlsSettings.echConfigList = node.ech;
+                        xtlsSettings.echForceQuery = true;
+                    }
                     if (!string.IsNullOrWhiteSpace(sni))
                     {
                         xtlsSettings.serverName = sni;
