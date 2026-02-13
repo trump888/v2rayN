@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Windows.Forms;
@@ -11,9 +11,46 @@ namespace v2rayN.Forms
 {
     public partial class OptionSettingForm : BaseForm
     {
+        private TextBox txtDnsHosts;
+        private TextBox txtFakeDNS;
+        private CheckBox chkEnableFakeDNS;
+        private Label lblDnsHosts;
+        private Label lblFakeDNS;
+
         public OptionSettingForm()
         {
             InitializeComponent();
+            AddDnsControls();
+        }
+
+        private void AddDnsControls()
+        {
+            lblDnsHosts = new Label();
+            lblDnsHosts.Text = "DNS Hosts:";
+            lblDnsHosts.Location = new System.Drawing.Point(15, 150);
+            lblDnsHosts.Size = new System.Drawing.Size(100, 20);
+            tabPage2.Controls.Add(lblDnsHosts);
+
+            txtDnsHosts = new TextBox();
+            txtDnsHosts.Location = new System.Drawing.Point(120, 147);
+            txtDnsHosts.Size = new System.Drawing.Size(350, 20);
+            tabPage2.Controls.Add(txtDnsHosts);
+
+            lblFakeDNS = new Label();
+            lblFakeDNS.Text = "FakeIP:";
+            lblFakeDNS.Location = new System.Drawing.Point(15, 180);
+            lblFakeDNS.Size = new System.Drawing.Size(100, 20);
+            tabPage2.Controls.Add(lblFakeDNS);
+
+            txtFakeDNS = new TextBox();
+            txtFakeDNS.Location = new System.Drawing.Point(120, 177);
+            txtFakeDNS.Size = new System.Drawing.Size(350, 20);
+            tabPage2.Controls.Add(txtFakeDNS);
+
+            chkEnableFakeDNS = new CheckBox();
+            chkEnableFakeDNS.Text = "Enable FakeIP";
+            chkEnableFakeDNS.Location = new System.Drawing.Point(120, 205);
+            tabPage2.Controls.Add(chkEnableFakeDNS);
         }
 
         private void OptionSettingForm_Load(object sender, EventArgs e)
@@ -59,6 +96,11 @@ namespace v2rayN.Forms
             //remoteDNS
             txtremoteDNS.Text = config.remoteDNS;
             cmbdomainStrategy4Freedom.Text = config.domainStrategy4Freedom;
+
+            //DNS Hosts
+            txtDnsHosts.Text = config.dnsHosts ?? "";
+            txtFakeDNS.Text = config.fakeDNS ?? "";
+            chkEnableFakeDNS.Checked = config.enableFakeDNS;
 
             chkdefAllowInsecure.Checked = config.defAllowInsecure;
 
@@ -234,6 +276,9 @@ namespace v2rayN.Forms
             //remoteDNS          
             config.remoteDNS = txtremoteDNS.Text.TrimEx();
             config.domainStrategy4Freedom = cmbdomainStrategy4Freedom.Text;
+            config.dnsHosts = txtDnsHosts.Text.TrimEx();
+            config.fakeDNS = txtFakeDNS.Text.TrimEx();
+            config.enableFakeDNS = chkEnableFakeDNS.Checked;
 
             config.defAllowInsecure = chkdefAllowInsecure.Checked;
 
