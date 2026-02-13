@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
+using v2rayN;
 using v2rayN.Base;
 using v2rayN.Mode;
 using v2rayN.Resx;
