@@ -15,6 +15,55 @@ namespace v2rayN.Handler
 {
     class ShareHandler
     {
+        private static readonly Regex UrlRegex = new(@"^(?:([a-zA-Z][a-zA-Z0-9+.-]+):/{2,})?([^/?#]+)([^?#]*)?.*$", RegexOptions.Compiled);
+
+        private static Uri? TryParseUri(string url, string scheme)
+        {
+            try
+            {
+                return new Uri(url);
+            }
+            catch
+            {
+                var match = UrlRegex.Match(url);
+                if (!match.Success) return null;
+
+                var authority = match.Groups[2].Value;
+                var atIndex = authority.LastIndexOf('@');
+                if (atIndex > 0)
+                {
+                    authority = authority.Substring(atIndex + 1);
+                }
+
+                var host = authority;
+                int port = 0;
+                if (authority.StartsWith("["))
+                {
+                    var bracketEnd = authority.LastIndexOf(']');
+                    if (bracketEnd > 0)
+                    {
+                        host = authority.Substring(1, bracketEnd - 1);
+                        if (bracketEnd < authority.Length - 1 && authority[bracketEnd + 1] == ':')
+                        {
+                            int.TryParse(authority.Substring(bracketEnd + 2), out port);
+                        }
+                    }
+                }
+                else
+                {
+                    var colonIndex = authority.LastIndexOf(':');
+                    if (colonIndex > 0 && authority.Substring(colonIndex + 1).All(char.IsDigit))
+                    {
+                        int.TryParse(authority.Substring(colonIndex + 1), out port);
+                        host = authority.Substring(0, colonIndex);
+                    }
+                }
+
+                var pathAndQuery = match.Groups[3].Value;
+                var fullUrl = $"{scheme}//{host}:{port}{pathAndQuery}";
+                try { return new Uri(fullUrl); } catch { return null; }
+            }
+        }
 
         #region GetShareUrl
 
@@ -850,78 +899,15 @@ namespace v2rayN.Handler
                 configType = EConfigType.Hysteria2
             };
 
-            result = result.TrimStart();
-            string urlPart = result.Substring("hysteria2://".Length);
-            
-            string remark = "";
-            int hashIndex = urlPart.IndexOf('#');
-            if (hashIndex >= 0)
-            {
-                remark = urlPart.Substring(hashIndex + 1);
-                urlPart = urlPart.Substring(0, hashIndex);
-            }
+            var url = TryParseUri(result, "hysteria2://");
+            if (url == null) return null;
 
-            string queryPart = "";
-            int queryIndex = urlPart.IndexOf('?');
-            if (queryIndex >= 0)
-            {
-                queryPart = urlPart.Substring(queryIndex + 1);
-                urlPart = urlPart.Substring(0, queryIndex);
-            }
+            item.address = url.IdnHost;
+            item.port = url.Port;
+            item.remarks = url.GetComponents(UriComponents.Fragment, UriFormat.Unescaped);
+            item.id = url.UserInfo;
 
-            string userInfo = "";
-            int atIndex = urlPart.IndexOf('@');
-            if (atIndex >= 0)
-            {
-                userInfo = urlPart.Substring(0, atIndex);
-                urlPart = urlPart.Substring(atIndex + 1);
-            }
-
-            string address = "";
-            int port = 0;
-            if (urlPart.StartsWith("["))
-            {
-                int bracketEnd = urlPart.IndexOf(']');
-                if (bracketEnd >= 0)
-                {
-                    address = urlPart.Substring(1, bracketEnd - 1);
-                    string remaining = urlPart.Substring(bracketEnd + 1);
-                    if (remaining.StartsWith(":"))
-                    {
-                        int colonIndex = remaining.IndexOf(':');
-                        if (colonIndex > 0)
-                        {
-                            string portStr = remaining.Substring(1);
-                            int.TryParse(portStr, out port);
-                        }
-                        else
-                        {
-                            int.TryParse(remaining.Substring(1), out port);
-                        }
-                    }
-                }
-            }
-            else
-            {
-                int colonIndex = urlPart.LastIndexOf(':');
-                if (colonIndex >= 0)
-                {
-                    address = urlPart.Substring(0, colonIndex);
-                    string portStr = urlPart.Substring(colonIndex + 1);
-                    int.TryParse(portStr, out port);
-                }
-                else
-                {
-                    address = urlPart;
-                }
-            }
-
-            item.address = address;
-            item.port = port;
-            item.remarks = Uri.UnescapeDataString(remark);
-            item.id = userInfo;
-
-            var query = HttpUtility.ParseQueryString(queryPart);
+            var query = HttpUtility.ParseQueryString(url.Query);
             if (int.TryParse(query["upmbps"], out int up))
                 item.upMbps = up;
             if (int.TryParse(query["downmbps"], out int down))
@@ -936,6 +922,67 @@ namespace v2rayN.Handler
             item.alpn = Utils.String2List(Utils.UrlDecode(query["alpn"] ?? ""));
 
             return item;
+        }
+
+        private static string ShareHysteria2(VmessItem item)
+        {
+            string url = string.Empty;
+            string remark = string.Empty;
+            if (!Utils.IsNullOrEmpty(item.remarks))
+            {
+                remark = "#" + Utils.UrlEncode(item.remarks);
+            }
+
+            var dicQuery = new Dictionary<string, string>();
+            if (item.upMbps != null && item.upMbps > 0)
+            {
+                dicQuery["upmbps"] = item.upMbps.ToString();
+            }
+            if (item.downMbps != null && item.downMbps > 0)
+            {
+                dicQuery["downmbps"] = item.downMbps.ToString();
+            }
+            if (!Utils.IsNullOrEmpty(item.obfs))
+            {
+                dicQuery["obfs"] = item.obfs;
+            }
+            if (!Utils.IsNullOrEmpty(item.obfsPassword))
+            {
+                dicQuery["obfs-password"] = item.obfsPassword;
+            }
+            if (!Utils.IsNullOrEmpty(item.sni))
+            {
+                dicQuery["sni"] = item.sni;
+            }
+            if (item.alpn != null && item.alpn.Count > 0)
+            {
+                dicQuery["alpn"] = Utils.UrlEncode(Utils.List2String(item.alpn));
+            }
+            if (!Utils.IsNullOrEmpty(item.streamSecurity))
+            {
+                dicQuery["security"] = item.streamSecurity;
+            }
+            if (!Utils.IsNullOrEmpty(item.fingerprint))
+            {
+                dicQuery["fingerprint"] = item.fingerprint;
+            }
+            if (!Utils.IsNullOrEmpty(item.certSha256))
+            {
+                dicQuery["certSha256"] = item.certSha256;
+            }
+            if (!Utils.IsNullOrEmpty(item.ech))
+            {
+                dicQuery["ech"] = item.ech;
+            }
+
+            string query = dicQuery.Count > 0 ? "?" + string.Join("&", dicQuery.Select(x => x.Key + "=" + x.Value).ToArray()) : "";
+
+            url = string.Format("{0}@{1}:{2}",
+            item.id,
+            GetIpv6(item.address),
+            item.port);
+            url = $"{Global.hysteria2Protocol}{url}{query}{remark}";
+            return url;
         }
 
         private static string ShareMieru(VmessItem item)
@@ -986,69 +1033,15 @@ namespace v2rayN.Handler
                 configType = EConfigType.Mieru
             };
 
-            result = result.TrimStart();
-            string urlPart = result.Substring("mieru://".Length);
-            
-            string remark = "";
-            int hashIndex = urlPart.IndexOf('#');
-            if (hashIndex >= 0)
-            {
-                remark = urlPart.Substring(hashIndex + 1);
-                urlPart = urlPart.Substring(0, hashIndex);
-            }
+            var url = TryParseUri(result, "mieru://");
+            if (url == null) return null;
 
-            string queryPart = "";
-            int queryIndex = urlPart.IndexOf('?');
-            if (queryIndex >= 0)
-            {
-                queryPart = urlPart.Substring(queryIndex + 1);
-                urlPart = urlPart.Substring(0, queryIndex);
-            }
+            item.address = url.IdnHost;
+            item.port = url.Port;
+            item.remarks = url.GetComponents(UriComponents.Fragment, UriFormat.Unescaped);
+            item.id = url.UserInfo;
 
-            string userInfo = "";
-            int atIndex = urlPart.IndexOf('@');
-            if (atIndex >= 0)
-            {
-                userInfo = urlPart.Substring(0, atIndex);
-                urlPart = urlPart.Substring(atIndex + 1);
-            }
-
-            string address = "";
-            int port = 0;
-            if (urlPart.StartsWith("["))
-            {
-                int bracketEnd = urlPart.IndexOf(']');
-                if (bracketEnd >= 0)
-                {
-                    address = urlPart.Substring(1, bracketEnd - 1);
-                    string remaining = urlPart.Substring(bracketEnd + 1);
-                    if (remaining.StartsWith(":"))
-                    {
-                        int.TryParse(remaining.Substring(1), out port);
-                    }
-                }
-            }
-            else
-            {
-                int colonIndex = urlPart.LastIndexOf(':');
-                if (colonIndex >= 0)
-                {
-                    address = urlPart.Substring(0, colonIndex);
-                    string portStr = urlPart.Substring(colonIndex + 1);
-                    int.TryParse(portStr, out port);
-                }
-                else
-                {
-                    address = urlPart;
-                }
-            }
-
-            item.address = address;
-            item.port = port;
-            item.remarks = Uri.UnescapeDataString(remark);
-            item.id = userInfo;
-
-            var query = HttpUtility.ParseQueryString(queryPart);
+            var query = HttpUtility.ParseQueryString(url.Query);
             item.streamSecurity = query["security"] ?? "";
             item.sni = query["sni"] ?? "";
             item.alpn = Utils.String2List(Utils.UrlDecode(query["alpn"] ?? ""));
@@ -1106,69 +1099,15 @@ namespace v2rayN.Handler
                 configType = EConfigType.TUIC
             };
 
-            result = result.TrimStart();
-            string urlPart = result.Substring("tuic://".Length);
-            
-            string remark = "";
-            int hashIndex = urlPart.IndexOf('#');
-            if (hashIndex >= 0)
-            {
-                remark = urlPart.Substring(hashIndex + 1);
-                urlPart = urlPart.Substring(0, hashIndex);
-            }
+            var url = TryParseUri(result, "tuic://");
+            if (url == null) return null;
 
-            string queryPart = "";
-            int queryIndex = urlPart.IndexOf('?');
-            if (queryIndex >= 0)
-            {
-                queryPart = urlPart.Substring(queryIndex + 1);
-                urlPart = urlPart.Substring(0, queryIndex);
-            }
+            item.address = url.IdnHost;
+            item.port = url.Port;
+            item.remarks = url.GetComponents(UriComponents.Fragment, UriFormat.Unescaped);
+            item.id = url.UserInfo;
 
-            string userInfo = "";
-            int atIndex = urlPart.IndexOf('@');
-            if (atIndex >= 0)
-            {
-                userInfo = urlPart.Substring(0, atIndex);
-                urlPart = urlPart.Substring(atIndex + 1);
-            }
-
-            string address = "";
-            int port = 0;
-            if (urlPart.StartsWith("["))
-            {
-                int bracketEnd = urlPart.IndexOf(']');
-                if (bracketEnd >= 0)
-                {
-                    address = urlPart.Substring(1, bracketEnd - 1);
-                    string remaining = urlPart.Substring(bracketEnd + 1);
-                    if (remaining.StartsWith(":"))
-                    {
-                        int.TryParse(remaining.Substring(1), out port);
-                    }
-                }
-            }
-            else
-            {
-                int colonIndex = urlPart.LastIndexOf(':');
-                if (colonIndex >= 0)
-                {
-                    address = urlPart.Substring(0, colonIndex);
-                    string portStr = urlPart.Substring(colonIndex + 1);
-                    int.TryParse(portStr, out port);
-                }
-                else
-                {
-                    address = urlPart;
-                }
-            }
-
-            item.address = address;
-            item.port = port;
-            item.remarks = Uri.UnescapeDataString(remark);
-            item.id = userInfo;
-
-            var query = HttpUtility.ParseQueryString(queryPart);
+            var query = HttpUtility.ParseQueryString(url.Query);
             item.security = query["encryption"] ?? "";
             item.sni = query["sni"] ?? "";
             item.alpn = Utils.String2List(Utils.UrlDecode(query["alpn"] ?? ""));
