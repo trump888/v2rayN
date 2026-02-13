@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -851,7 +851,8 @@ namespace v2rayN.Handler
                     //servers.Add("localhost");
                     v2rayConfig.dns = new Mode.Dns
                     {
-                        servers = servers
+                        servers = servers,
+                        hosts = ParseHostsToDictionary(config.dnsHosts)
                     };
                 }
             }

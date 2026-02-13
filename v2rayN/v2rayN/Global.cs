@@ -1,4 +1,4 @@
-﻿
+
 using System.Collections.Generic;
 
 namespace v2rayN
@@ -21,6 +21,10 @@ namespace v2rayN
         public const string naiveproxyCoreUrl = "https://github.com/klzgrad/naiveproxy/releases";
         public const string tuicCoreUrl = "https://github.com/EAimTY/tuic/releases";
         public const string singboxCoreUrl = "https://github.com/SagerNet/sing-box/releases";
+        public const string hysteria2CoreUrl = "https://github.com/apernet/hysteria/releases";
+        public const string mieruCoreUrl = "https://github.com/zzzgydi/mieru/releases";
+        public const string mieruProtocol = "mieru://";
+        public const string tuicProtocol = "tuic://";
         public const string geoUrl = "https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/{0}.dat";
 
 
@@ -173,6 +177,18 @@ namespace v2rayN
         /// trojan
         /// </summary>
         public const string trojanProtocolLite = "trojan";
+        /// <summary>
+        /// hysteria2
+        /// </summary>
+        public const string hysteria2Protocol = "hysteria2://";
+        /// <summary>
+        /// hysteria2
+        /// </summary>
+        public const string hysteria2ProtocolLite = "hysteria2";
+        /// <summary>
+        /// tuic
+        /// </summary>
+        public const string tuicProtocol = "tuic://";
 
         /// <summary>
         /// email
@@ -221,6 +237,12 @@ namespace v2rayN
         public const string GrpcgunMode = "gun";
         public const string GrpcmultiMode = "multi";
         public const string CheckMark = "√";
+
+        public const int Hysteria2DefaultUpMbps = 100;
+        public const int Hysteria2DefaultDownMbps = 100;
+        public const int Hysteria2DefaultHopInterval = 10;
+
+        public static readonly List<string> hysteria2Alpn = new List<string> { "h3", "" };
 
         #endregion
 

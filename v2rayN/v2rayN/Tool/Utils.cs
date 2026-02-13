@@ -1,4 +1,4 @@
-﻿using Microsoft.Win32;
+using Microsoft.Win32;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
@@ -1148,6 +1148,49 @@ namespace v2rayN
         [DllImport("user32.dll")]
         public static extern bool IsWindow(IntPtr hwnd);
 
+
+        #endregion
+
+        #region DNS Hosts
+
+        public static Dictionary<string, string> ParseHostsToDictionary(string hostsContent)
+        {
+            var result = new Dictionary<string, string>();
+            if (string.IsNullOrWhiteSpace(hostsContent))
+            {
+                return result;
+            }
+
+            var lines = hostsContent.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+            foreach (var line in lines)
+            {
+                var trimmedLine = line.Trim();
+                if (string.IsNullOrWhiteSpace(trimmedLine) || trimmedLine.StartsWith("#"))
+                {
+                    continue;
+                }
+
+                var parts = trimmedLine.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length >= 2)
+                {
+                    var ip = parts[0];
+                    if (IsIpAddress(ip))
+                    {
+                        var domain = parts[1];
+                        if (!result.ContainsKey(domain))
+                        {
+                            result[domain] = ip;
+                        }
+                    }
+                }
+            }
+            return result;
+        }
+
+        public static bool IsIpAddress(string value)
+        {
+            return IPAddress.TryParse(value, out _);
+        }
 
         #endregion
     }

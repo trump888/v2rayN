@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Linq;
@@ -45,6 +45,15 @@ namespace v2rayN.Handler
                         break;
                     case EConfigType.VLESS:
                         url = ShareVLESS(item);
+                        break;
+                    case EConfigType.Hysteria2:
+                        url = ShareHysteria2(item);
+                        break;
+                    case EConfigType.Mieru:
+                        url = ShareMieru(item);
+                        break;
+                    case EConfigType.TUIC:
+                        url = ShareTuic(item);
                         break;
                     default:
                         break;
@@ -147,6 +156,63 @@ namespace v2rayN.Handler
             GetIpv6(item.address),
             item.port);
             url = $"{Global.trojanProtocol}{url}{query}{remark}";
+            return url;
+        }
+
+        private static string ShareHysteria2(VmessItem item)
+        {
+            string url = string.Empty;
+            string remark = string.Empty;
+            if (!Utils.IsNullOrEmpty(item.remarks))
+            {
+                remark = "#" + Utils.UrlEncode(item.remarks);
+            }
+
+            var dicQuery = new Dictionary<string, string>();
+            if (item.upMbps > 0)
+            {
+                dicQuery["upmbps"] = item.upMbps.ToString();
+            }
+            if (item.downMbps > 0)
+            {
+                dicQuery["downmbps"] = item.downMbps.ToString();
+            }
+            if (!Utils.IsNullOrEmpty(item.obfs))
+            {
+                dicQuery["obfs"] = item.obfs;
+            }
+            if (!Utils.IsNullOrEmpty(item.obfsPassword))
+            {
+                dicQuery["obfs-password"] = item.obfsPassword;
+            }
+            if (!Utils.IsNullOrEmpty(item.sni))
+            {
+                dicQuery["sni"] = item.sni;
+            }
+            if (item.alpn != null && item.alpn.Count > 0)
+            {
+                dicQuery["alpn"] = Utils.UrlEncode(Utils.List2String(item.alpn));
+            }
+            if (!Utils.IsNullOrEmpty(item.streamSecurity))
+            {
+                dicQuery["security"] = item.streamSecurity;
+            }
+            if (!Utils.IsNullOrEmpty(item.fingerprint))
+            {
+                dicQuery["fingerprint"] = item.fingerprint;
+            }
+            if (!Utils.IsNullOrEmpty(item.certSha256))
+            {
+                dicQuery["certSha256"] = item.certSha256;
+            }
+
+            string query = dicQuery.Count > 0 ? "?" + string.Join("&", dicQuery.Select(x => x.Key + "=" + x.Value).ToArray()) : "";
+
+            url = string.Format("{0}@{1}:{2}",
+            item.id,
+            GetIpv6(item.address),
+            item.port);
+            url = $"{Global.hysteria2Protocol}{url}{query}{remark}";
             return url;
         }
 
@@ -354,6 +420,18 @@ namespace v2rayN.Handler
                     vmessItem = ResolveStdVLESS(result);
 
                     ConfigHandler.UpgradeServerVersion(ref vmessItem);
+                }
+                else if (result.StartsWith(Global.hysteria2Protocol))
+                {
+                    vmessItem = ResolveHysteria2(result);
+                }
+                else if (result.StartsWith(Global.mieruProtocol))
+                {
+                    vmessItem = ResolveMieru(result);
+                }
+                else if (result.StartsWith(Global.tuicProtocol))
+                {
+                    vmessItem = ResolveTuic(result);
                 }
                 else
                 {
@@ -757,6 +835,156 @@ namespace v2rayN.Handler
             item.security = query["encryption"] ?? "none";
             item.streamSecurity = query["security"] ?? "";
             ResolveStdTransport(query, ref item);
+
+            return item;
+        }
+
+        private static VmessItem ResolveHysteria2(string result)
+        {
+            VmessItem item = new VmessItem
+            {
+                configType = EConfigType.Hysteria2
+            };
+
+            Uri url = new Uri(result);
+
+            item.address = url.IdnHost;
+            item.port = url.Port;
+            item.remarks = url.GetComponents(UriComponents.Fragment, UriFormat.Unescaped);
+            item.id = url.UserInfo;
+
+            var query = HttpUtility.ParseQueryString(url.Query);
+            if (int.TryParse(query["upmbps"], out int up))
+                item.upMbps = up;
+            if (int.TryParse(query["downmbps"], out int down))
+                item.downMbps = down;
+            item.obfs = query["obfs"] ?? "";
+            item.obfsPassword = query["obfs-password"] ?? "";
+            item.sni = query["sni"] ?? "";
+            item.streamSecurity = query["security"] ?? "";
+            item.fingerprint = query["fingerprint"] ?? "";
+            item.certSha256 = query["certSha256"] ?? "";
+            item.alpn = Utils.String2List(Utils.UrlDecode(query["alpn"] ?? ""));
+
+            return item;
+        }
+
+        private static string ShareMieru(VmessItem item)
+        {
+            string url = string.Empty;
+            string remark = string.Empty;
+            if (!Utils.IsNullOrEmpty(item.remarks))
+            {
+                remark = "#" + Utils.UrlEncode(item.remarks);
+            }
+
+            var dicQuery = new Dictionary<string, string>();
+            if (!Utils.IsNullOrEmpty(item.streamSecurity))
+            {
+                dicQuery["security"] = item.streamSecurity;
+            }
+            if (!Utils.IsNullOrEmpty(item.sni))
+            {
+                dicQuery["sni"] = item.sni;
+            }
+            if (item.alpn != null && item.alpn.Count > 0)
+            {
+                dicQuery["alpn"] = Utils.UrlEncode(Utils.List2String(item.alpn));
+            }
+
+            string query = dicQuery.Count > 0 ? "?" + string.Join("&", dicQuery.Select(x => x.Key + "=" + x.Value).ToArray()) : "";
+
+            url = string.Format("{0}@{1}:{2}",
+            item.id,
+            GetIpv6(item.address),
+            item.port);
+            url = $"{Global.mieruProtocol}{url}{query}{remark}";
+            return url;
+        }
+
+        private static VmessItem ResolveMieru(string result)
+        {
+            VmessItem item = new VmessItem
+            {
+                configType = EConfigType.Mieru
+            };
+
+            Uri url = new Uri(result);
+
+            item.address = url.IdnHost;
+            item.port = url.Port;
+            item.remarks = url.GetComponents(UriComponents.Fragment, UriFormat.Unescaped);
+            item.id = url.UserInfo;
+
+            var query = HttpUtility.ParseQueryString(url.Query);
+            item.streamSecurity = query["security"] ?? "";
+            item.sni = query["sni"] ?? "";
+            item.alpn = Utils.String2List(Utils.UrlDecode(query["alpn"] ?? ""));
+
+            return item;
+        }
+
+        private static string ShareTuic(VmessItem item)
+        {
+            string url = string.Empty;
+            string remark = string.Empty;
+            if (!Utils.IsNullOrEmpty(item.remarks))
+            {
+                remark = "#" + Utils.UrlEncode(item.remarks);
+            }
+
+            var dicQuery = new Dictionary<string, string>();
+            if (!Utils.IsNullOrEmpty(item.security))
+            {
+                dicQuery["encryption"] = item.security;
+            }
+            if (!Utils.IsNullOrEmpty(item.sni))
+            {
+                dicQuery["sni"] = item.sni;
+            }
+            if (item.alpn != null && item.alpn.Count > 0)
+            {
+                dicQuery["alpn"] = Utils.UrlEncode(Utils.List2String(item.alpn));
+            }
+            if (!Utils.IsNullOrEmpty(item.fingerprint))
+            {
+                dicQuery["fingerprint"] = item.fingerprint;
+            }
+            if (!Utils.IsNullOrEmpty(item.certSha256))
+            {
+                dicQuery["certSha256"] = item.certSha256;
+            }
+
+            string query = dicQuery.Count > 0 ? "?" + string.Join("&", dicQuery.Select(x => x.Key + "=" + x.Value).ToArray()) : "";
+
+            url = string.Format("{0}@{1}:{2}",
+            item.id,
+            GetIpv6(item.address),
+            item.port);
+            url = $"{Global.tuicProtocol}{url}{query}{remark}";
+            return url;
+        }
+
+        private static VmessItem ResolveTuic(string result)
+        {
+            VmessItem item = new VmessItem
+            {
+                configType = EConfigType.TUIC
+            };
+
+            Uri url = new Uri(result);
+
+            item.address = url.IdnHost;
+            item.port = url.Port;
+            item.remarks = url.GetComponents(UriComponents.Fragment, UriFormat.Unescaped);
+            item.id = url.UserInfo;
+
+            var query = HttpUtility.ParseQueryString(url.Query);
+            item.security = query["encryption"] ?? "";
+            item.sni = query["sni"] ?? "";
+            item.alpn = Utils.String2List(Utils.UrlDecode(query["alpn"] ?? ""));
+            item.fingerprint = query["fingerprint"] ?? "";
+            item.certSha256 = query["certSha256"] ?? "";
 
             return item;
         }

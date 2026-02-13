@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 
 namespace v2rayN.Mode
 {
@@ -337,6 +337,10 @@ namespace v2rayN.Mode
         /// 
         /// </summary>
         public List<string> servers { get; set; }
+        /// <summary>
+        /// DNS Hosts
+        /// </summary>
+        public Dictionary<string, string> hosts { get; set; }
     }
 
     public class Routing

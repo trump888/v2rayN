@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Windows.Forms;
 using v2rayN.Base;
@@ -80,6 +80,22 @@ namespace v2rayN.Mode
         /// 自定义远程DNS
         /// </summary>
         public string remoteDNS
+        {
+            get; set;
+        }
+
+        /// <summary>
+        /// DNS Hosts
+        /// </summary>
+        public string dnsHosts
+        {
+            get; set;
+        }
+
+        /// <summary>
+        /// Enable FakeIP
+        /// </summary>
+        public bool enableFakeDNS
         {
             get; set;
         }
@@ -171,6 +187,14 @@ namespace v2rayN.Mode
         /// KcpItem
         /// </summary>
         public KcpItem kcpItem
+        {
+            get; set;
+        }
+
+        /// <summary>
+        /// HysteriaItem
+        /// </summary>
+        public HysteriaItem hysteriaItem
         {
             get; set;
         }
@@ -575,6 +599,12 @@ namespace v2rayN.Mode
         }
 
         public string fingerprint { get; set; }
+
+        public int? upMbps { get; set; }
+        public int? downMbps { get; set; }
+        public string obfsPassword { get; set; }
+        public string obfs { get; set; }
+        public string certSha256 { get; set; }
     }
 
     [Serializable]
@@ -669,6 +699,14 @@ namespace v2rayN.Mode
         {
             get; set;
         }
+    }
+
+    [Serializable]
+    public class HysteriaItem
+    {
+        public int UpMbps { get; set; } = 100;
+        public int DownMbps { get; set; } = 100;
+        public string ObfsPassword { get; set; }
     }
 
 

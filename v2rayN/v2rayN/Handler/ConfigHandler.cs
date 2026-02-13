@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
@@ -112,6 +112,15 @@ namespace v2rayN.Handler
                     readBufferSize = 2,
                     writeBufferSize = 2,
                     congestion = false
+                };
+            }
+            //hysteria2
+            if (config.hysteriaItem == null)
+            {
+                config.hysteriaItem = new HysteriaItem
+                {
+                    UpMbps = 100,
+                    DownMbps = 100
                 };
             }
             if (config.uiItem == null)
