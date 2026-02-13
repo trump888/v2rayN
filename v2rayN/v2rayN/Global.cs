@@ -185,10 +185,6 @@ namespace v2rayN
         /// hysteria2
         /// </summary>
         public const string hysteria2ProtocolLite = "hysteria2";
-        /// <summary>
-        /// tuic
-        /// </summary>
-        public const string tuicProtocol = "tuic://";
 
         /// <summary>
         /// email
