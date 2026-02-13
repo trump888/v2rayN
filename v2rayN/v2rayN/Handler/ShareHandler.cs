@@ -17,7 +17,7 @@ namespace v2rayN.Handler
     {
         private static readonly Regex UrlRegex = new(@"^(?:([a-zA-Z][a-zA-Z0-9+.-]+):/{2,})?([^/?#]+)([^?#]*)?.*$", RegexOptions.Compiled);
 
-        private static Uri? TryParseUri(string url, string scheme)
+        private static Uri TryParseUri(string url, string scheme)
         {
             try
             {
@@ -922,67 +922,6 @@ namespace v2rayN.Handler
             item.alpn = Utils.String2List(Utils.UrlDecode(query["alpn"] ?? ""));
 
             return item;
-        }
-
-        private static string ShareHysteria2(VmessItem item)
-        {
-            string url = string.Empty;
-            string remark = string.Empty;
-            if (!Utils.IsNullOrEmpty(item.remarks))
-            {
-                remark = "#" + Utils.UrlEncode(item.remarks);
-            }
-
-            var dicQuery = new Dictionary<string, string>();
-            if (item.upMbps != null && item.upMbps > 0)
-            {
-                dicQuery["upmbps"] = item.upMbps.ToString();
-            }
-            if (item.downMbps != null && item.downMbps > 0)
-            {
-                dicQuery["downmbps"] = item.downMbps.ToString();
-            }
-            if (!Utils.IsNullOrEmpty(item.obfs))
-            {
-                dicQuery["obfs"] = item.obfs;
-            }
-            if (!Utils.IsNullOrEmpty(item.obfsPassword))
-            {
-                dicQuery["obfs-password"] = item.obfsPassword;
-            }
-            if (!Utils.IsNullOrEmpty(item.sni))
-            {
-                dicQuery["sni"] = item.sni;
-            }
-            if (item.alpn != null && item.alpn.Count > 0)
-            {
-                dicQuery["alpn"] = Utils.UrlEncode(Utils.List2String(item.alpn));
-            }
-            if (!Utils.IsNullOrEmpty(item.streamSecurity))
-            {
-                dicQuery["security"] = item.streamSecurity;
-            }
-            if (!Utils.IsNullOrEmpty(item.fingerprint))
-            {
-                dicQuery["fingerprint"] = item.fingerprint;
-            }
-            if (!Utils.IsNullOrEmpty(item.certSha256))
-            {
-                dicQuery["certSha256"] = item.certSha256;
-            }
-            if (!Utils.IsNullOrEmpty(item.ech))
-            {
-                dicQuery["ech"] = item.ech;
-            }
-
-            string query = dicQuery.Count > 0 ? "?" + string.Join("&", dicQuery.Select(x => x.Key + "=" + x.Value).ToArray()) : "";
-
-            url = string.Format("{0}@{1}:{2}",
-            item.id,
-            GetIpv6(item.address),
-            item.port);
-            url = $"{Global.hysteria2Protocol}{url}{query}{remark}";
-            return url;
         }
 
         private static string ShareMieru(VmessItem item)
