@@ -943,6 +943,27 @@ namespace v2rayN.Handler
                         countServers++;
                     }
                 }
+                else if (vmessItem.configType == EConfigType.Hysteria2)
+                {
+                    if (AddServer(ref config, vmessItem, false) == 0)
+                    {
+                        countServers++;
+                    }
+                }
+                else if (vmessItem.configType == EConfigType.Mieru)
+                {
+                    if (AddServer(ref config, vmessItem, false) == 0)
+                    {
+                        countServers++;
+                    }
+                }
+                else if (vmessItem.configType == EConfigType.TUIC)
+                {
+                    if (AddServer(ref config, vmessItem, false) == 0)
+                    {
+                        countServers++;
+                    }
+                }
             }
 
             ToJsonFile(config);
