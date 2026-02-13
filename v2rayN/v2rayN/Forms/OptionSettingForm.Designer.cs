@@ -1,4 +1,4 @@
-﻿namespace v2rayN.Forms
+namespace v2rayN.Forms
 {
     partial class OptionSettingForm
     {
@@ -55,6 +55,11 @@
             this.linkDnsObjectDoc = new System.Windows.Forms.LinkLabel();
             this.txtremoteDNS = new System.Windows.Forms.TextBox();
             this.label14 = new System.Windows.Forms.Label();
+            this.labelDnsHosts = new System.Windows.Forms.Label();
+            this.txtDnsHosts = new System.Windows.Forms.TextBox();
+            this.labelFakeDNS = new System.Windows.Forms.Label();
+            this.txtFakeDNS = new System.Windows.Forms.TextBox();
+            this.chkEnableFakeDNS = new System.Windows.Forms.CheckBox();
             this.tabPage6 = new System.Windows.Forms.TabPage();
             this.chkKcpcongestion = new System.Windows.Forms.CheckBox();
             this.txtKcpwriteBufferSize = new System.Windows.Forms.TextBox();
@@ -272,6 +277,11 @@
             // 
             // tabPage2
             // 
+            this.tabPage2.Controls.Add(this.chkEnableFakeDNS);
+            this.tabPage2.Controls.Add(this.txtFakeDNS);
+            this.tabPage2.Controls.Add(this.labelFakeDNS);
+            this.tabPage2.Controls.Add(this.txtDnsHosts);
+            this.tabPage2.Controls.Add(this.labelDnsHosts);
             this.tabPage2.Controls.Add(this.cmbdomainStrategy4Freedom);
             this.tabPage2.Controls.Add(this.label19);
             this.tabPage2.Controls.Add(this.linkDnsObjectDoc);
@@ -314,6 +324,39 @@
             // 
             resources.ApplyResources(this.label14, "label14");
             this.label14.Name = "label14";
+            // 
+            // labelDnsHosts
+            // 
+            this.labelDnsHosts.Name = "labelDnsHosts";
+            this.labelDnsHosts.Text = "DNS Hosts:";
+            this.labelDnsHosts.Location = new System.Drawing.Point(30, 120);
+            this.labelDnsHosts.Size = new System.Drawing.Size(80, 20);
+            // 
+            // txtDnsHosts
+            // 
+            this.txtDnsHosts.Location = new System.Drawing.Point(120, 117);
+            this.txtDnsHosts.Size = new System.Drawing.Size(350, 20);
+            this.txtDnsHosts.Name = "txtDnsHosts";
+            // 
+            // labelFakeDNS
+            // 
+            this.labelFakeDNS.Name = "labelFakeDNS";
+            this.labelFakeDNS.Text = "FakeIP:";
+            this.labelFakeDNS.Location = new System.Drawing.Point(30, 150);
+            this.labelFakeDNS.Size = new System.Drawing.Size(80, 20);
+            // 
+            // txtFakeDNS
+            // 
+            this.txtFakeDNS.Location = new System.Drawing.Point(120, 147);
+            this.txtFakeDNS.Size = new System.Drawing.Size(350, 20);
+            this.txtFakeDNS.Name = "txtFakeDNS";
+            // 
+            // chkEnableFakeDNS
+            // 
+            this.chkEnableFakeDNS.Name = "chkEnableFakeDNS";
+            this.chkEnableFakeDNS.Text = "Enable FakeIP";
+            this.chkEnableFakeDNS.Location = new System.Drawing.Point(120, 175);
+            this.chkEnableFakeDNS.Size = new System.Drawing.Size(120, 20);
             // 
             // tabPage6
             // 
@@ -740,6 +783,11 @@
         private System.Windows.Forms.LinkLabel linkDnsObjectDoc;
         private System.Windows.Forms.TextBox txtremoteDNS;
         private System.Windows.Forms.Label label14;
+        private System.Windows.Forms.TextBox txtDnsHosts;
+        private System.Windows.Forms.Label labelDnsHosts;
+        private System.Windows.Forms.TextBox txtFakeDNS;
+        private System.Windows.Forms.Label labelFakeDNS;
+        private System.Windows.Forms.CheckBox chkEnableFakeDNS;
         private System.Windows.Forms.CheckBox chkIgnoreGeoUpdateCore;
         private System.Windows.Forms.TabPage tabPage3;
         private System.Windows.Forms.TextBox txtsystemProxyExceptions;
