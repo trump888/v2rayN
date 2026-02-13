@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using v2rayN.Mode;
 using System.Linq;
@@ -188,6 +188,26 @@ namespace v2rayN.Handler
                 coreExes = new List<string> { "tuic-client", "tuic" },
                 arguments = "-c config.json",
                 coreUrl = Global.tuicCoreUrl,
+                redirectInfo = true,
+            });
+
+            coreInfos.Add(new CoreInfo
+            {
+                coreType = ECoreType.hysteria2,
+                coreExes = new List<string> { "hysteria-windows-amd64", "hysteria" },
+                arguments = "server -c config.yaml",
+                coreUrl = Global.hysteria2CoreUrl,
+                coreReleaseApiUrl = Global.hysteria2CoreUrl.Replace(@"https://github.com", @"https://api.github.com/repos"),
+                redirectInfo = true,
+            });
+
+            coreInfos.Add(new CoreInfo
+            {
+                coreType = ECoreType.mieru,
+                coreExes = new List<string> { "mieru", "mieru-server" },
+                arguments = "server",
+                coreUrl = Global.mieruCoreUrl,
+                coreReleaseApiUrl = Global.mieruCoreUrl.Replace(@"https://github.com", @"https://api.github.com/repos"),
                 redirectInfo = true,
             });
 
