@@ -115,6 +115,7 @@ namespace v2rayN.Forms
             this.btnOK = new System.Windows.Forms.Button();
             this.panel1 = new System.Windows.Forms.Panel();
             this.chkEnableCheckPreReleaseUpdate = new System.Windows.Forms.CheckBox();
+            this.tabPageDns = new System.Windows.Forms.TabPage();
             this.tabControl1.SuspendLayout();
             this.tabPage1.SuspendLayout();
             this.groupBox1.SuspendLayout();
