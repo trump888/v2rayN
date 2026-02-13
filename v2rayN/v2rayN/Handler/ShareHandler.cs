@@ -436,6 +436,8 @@ namespace v2rayN.Handler
                     return null;
                 }
 
+                Utils.SaveLog($"ImportFromClipboardConfig: {result.Substring(0, Math.Min(100, result.Length))}");
+
                 if (result.StartsWith(Global.vmessProtocol))
                 {
                     int indexSplit = result.IndexOf("?");
@@ -503,16 +505,18 @@ namespace v2rayN.Handler
 
                     ConfigHandler.UpgradeServerVersion(ref vmessItem);
                 }
-                else if (result.StartsWith(Global.hysteria2Protocol))
+                else if (result.StartsWith(Global.hysteria2Protocol) || result.StartsWith(Global.hysteria2ProtocolLite))
                 {
+                    Utils.SaveLog($"Try parse hysteria2: {result.Substring(0, Math.Min(100, result.Length))}");
                     vmessItem = ResolveHysteria2(result);
+                    Utils.SaveLog($"ResolveHysteria2 result: {vmessItem == null}");
                     if (vmessItem == null)
                     {
                         msg = ResUI.ConfigurationFormatIncorrect;
                         return null;
                     }
                 }
-                else if (result.StartsWith(Global.mieruProtocol))
+                else if (result.StartsWith(Global.mieruProtocol) || result.StartsWith("mieru:"))
                 {
                     vmessItem = ResolveMieru(result);
                     if (vmessItem == null)
