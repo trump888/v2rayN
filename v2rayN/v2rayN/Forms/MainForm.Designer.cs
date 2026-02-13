@@ -1,4 +1,4 @@
-﻿namespace v2rayN.Forms
+namespace v2rayN.Forms
 {
     partial class MainForm
     {
@@ -38,6 +38,9 @@
             this.menuAddShadowsocksServer = new System.Windows.Forms.ToolStripMenuItem();
             this.menuAddSocksServer = new System.Windows.Forms.ToolStripMenuItem();
             this.menuAddTrojanServer = new System.Windows.Forms.ToolStripMenuItem();
+            this.menuAddHysteria2Server = new System.Windows.Forms.ToolStripMenuItem();
+            this.menuAddMieruServer = new System.Windows.Forms.ToolStripMenuItem();
+            this.menuAddTuicServer = new System.Windows.Forms.ToolStripMenuItem();
             this.menuAddCustomServer = new System.Windows.Forms.ToolStripMenuItem();
             this.menuAddServers = new System.Windows.Forms.ToolStripMenuItem();
             this.menuScanScreen = new System.Windows.Forms.ToolStripMenuItem();
@@ -190,6 +193,9 @@
             this.menuAddShadowsocksServer,
             this.menuAddSocksServer,
             this.menuAddTrojanServer,
+            this.menuAddHysteria2Server,
+            this.menuAddMieruServer,
+            this.menuAddTuicServer,
             this.menuAddCustomServer,
             this.menuAddServers,
             this.menuScanScreen,
@@ -249,6 +255,24 @@
             this.menuAddTrojanServer.Name = "menuAddTrojanServer";
             resources.ApplyResources(this.menuAddTrojanServer, "menuAddTrojanServer");
             this.menuAddTrojanServer.Click += new System.EventHandler(this.menuAddTrojanServer_Click);
+            // 
+            // menuAddHysteria2Server
+            // 
+            this.menuAddHysteria2Server.Name = "menuAddHysteria2Server";
+            this.menuAddHysteria2Server.Text = "Hysteria2";
+            this.menuAddHysteria2Server.Click += new System.EventHandler(this.menuAddHysteria2Server_Click);
+            // 
+            // menuAddMieruServer
+            // 
+            this.menuAddMieruServer.Name = "menuAddMieruServer";
+            this.menuAddMieruServer.Text = "Mieru";
+            this.menuAddMieruServer.Click += new System.EventHandler(this.menuAddMieruServer_Click);
+            // 
+            // menuAddTuicServer
+            // 
+            this.menuAddTuicServer.Name = "menuAddTuicServer";
+            this.menuAddTuicServer.Text = "TUIC";
+            this.menuAddTuicServer.Click += new System.EventHandler(this.menuAddTuicServer_Click);
             // 
             // menuAddCustomServer
             // 
@@ -975,6 +999,9 @@
         private System.Windows.Forms.ToolStripButton tsbQRCodeSwitch;
         private System.Windows.Forms.ToolStripMenuItem menuAddVlessServer;
         private System.Windows.Forms.ToolStripMenuItem menuAddTrojanServer;
+        private System.Windows.Forms.ToolStripMenuItem menuAddHysteria2Server;
+        private System.Windows.Forms.ToolStripMenuItem menuAddMieruServer;
+        private System.Windows.Forms.ToolStripMenuItem menuAddTuicServer;
         private System.Windows.Forms.ToolStripDropDownButton tsbSetting;
         private System.Windows.Forms.ToolStripMenuItem tsbOptionSetting;
         private System.Windows.Forms.ToolStripMenuItem tsbRoutingSetting;

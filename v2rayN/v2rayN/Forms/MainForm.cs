@@ -1,4 +1,4 @@
-﻿using NHotkey;
+using NHotkey;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -1025,6 +1025,24 @@ namespace v2rayN.Forms
         private void menuAddTrojanServer_Click(object sender, EventArgs e)
         {
             ShowServerForm(EConfigType.Trojan, -1);
+            ShowForm();
+        }
+
+        private void menuAddHysteria2Server_Click(object sender, EventArgs e)
+        {
+            ShowServerForm(EConfigType.Hysteria2, -1);
+            ShowForm();
+        }
+
+        private void menuAddMieruServer_Click(object sender, EventArgs e)
+        {
+            ShowServerForm(EConfigType.Mieru, -1);
+            ShowForm();
+        }
+
+        private void menuAddTuicServer_Click(object sender, EventArgs e)
+        {
+            ShowServerForm(EConfigType.TUIC, -1);
             ShowForm();
         }
 
