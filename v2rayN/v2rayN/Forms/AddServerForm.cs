@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Windows.Forms;
 using v2rayN.Handler;
@@ -56,6 +56,12 @@ namespace v2rayN.Forms
                     transportControl.AllowXtls = true;
 
                     cmbFlow6.Items.AddRange(Global.xtlsFlows.ToArray());
+                    break;
+                case EConfigType.Hysteria2:
+                case EConfigType.Mieru:
+                case EConfigType.TUIC:
+                    panVmess.Dock = DockStyle.Fill;
+                    panVmess.Visible = true;
                     break;
             }
 
