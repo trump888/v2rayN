@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace v2rayN.Mode
@@ -19,6 +19,8 @@ namespace v2rayN.Mode
         public List<string> domain { get; set; }
         
         public List<string> protocol { get; set; }
+
+        public List<string> process { get; set; }
 
         public bool enabled { get; set; } = true;
 
