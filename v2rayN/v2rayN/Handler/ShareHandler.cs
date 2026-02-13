@@ -205,6 +205,10 @@ namespace v2rayN.Handler
             {
                 dicQuery["certSha256"] = item.certSha256;
             }
+            if (!Utils.IsNullOrEmpty(item.ech))
+            {
+                dicQuery["ech"] = item.ech;
+            }
 
             string query = dicQuery.Count > 0 ? "?" + string.Join("&", dicQuery.Select(x => x.Key + "=" + x.Value).ToArray()) : "";
 
@@ -864,6 +868,7 @@ namespace v2rayN.Handler
             item.streamSecurity = query["security"] ?? "";
             item.fingerprint = query["fingerprint"] ?? "";
             item.certSha256 = query["certSha256"] ?? "";
+            item.ech = query["ech"] ?? "";
             item.alpn = Utils.String2List(Utils.UrlDecode(query["alpn"] ?? ""));
 
             return item;

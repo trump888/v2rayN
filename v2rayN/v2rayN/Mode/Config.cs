@@ -605,6 +605,7 @@ namespace v2rayN.Mode
         public string obfsPassword { get; set; }
         public string obfs { get; set; }
         public string certSha256 { get; set; }
+        public string ech { get; set; }
     }
 
     [Serializable]
