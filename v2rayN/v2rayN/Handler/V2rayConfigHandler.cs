@@ -850,10 +850,30 @@ namespace v2rayN.Handler
                         //}
                     }
                     //servers.Add("localhost");
+                    var dnsHosts = new Dictionary<string, string>();
+                    if (!Utils.IsNullOrEmpty(config.dnsHosts))
+                    {
+                        var lines = config.dnsHosts.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+                        foreach (var line in lines)
+                        {
+                            var trimmedLine = line.Trim();
+                            if (string.IsNullOrWhiteSpace(trimmedLine) || trimmedLine.StartsWith("#"))
+                                continue;
+                            var parts = trimmedLine.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+                            if (parts.Length >= 2)
+                            {
+                                if (IPAddress.TryParse(parts[0], out _))
+                                {
+                                    if (!dnsHosts.ContainsKey(parts[1]))
+                                        dnsHosts[parts[1]] = parts[0];
+                                }
+                            }
+                        }
+                    }
                     v2rayConfig.dns = new Mode.Dns
                     {
                         servers = servers,
-                        hosts = ParseHostsToDictionary(config.dnsHosts),
+                        hosts = dnsHosts,
                         fakeDns = config.enableFakeDNS && !Utils.IsNullOrEmpty(config.fakeDNS) 
                             ? Utils.String2List(config.fakeDNS) : null
                     };
