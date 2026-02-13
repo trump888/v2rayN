@@ -258,6 +258,10 @@ namespace v2rayN.Handler
             {
                 dicQuery["ech"] = item.ech;
             }
+            if (!Utils.IsNullOrEmpty(item.allowInsecure))
+            {
+                dicQuery["insecure"] = item.allowInsecure;
+            }
 
             string query = dicQuery.Count > 0 ? "?" + string.Join("&", dicQuery.Select(x => x.Key + "=" + x.Value).ToArray()) : "";
 
@@ -920,6 +924,10 @@ namespace v2rayN.Handler
             item.certSha256 = query["certSha256"] ?? "";
             item.ech = query["ech"] ?? "";
             item.alpn = Utils.String2List(Utils.UrlDecode(query["alpn"] ?? ""));
+            if (query["insecure"] != null)
+            {
+                item.allowInsecure = query["insecure"];
+            }
 
             return item;
         }
