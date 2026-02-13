@@ -575,6 +575,75 @@ namespace v2rayN.Handler
                     outbound.protocol = Global.trojanProtocolLite;
                     outbound.settings.vnext = null;
                 }
+                else if (node.configType == EConfigType.Hysteria2)
+                {
+                    ServersItem serversItem;
+                    if (outbound.settings.servers.Count <= 0)
+                    {
+                        serversItem = new ServersItem();
+                        outbound.settings.servers.Add(serversItem);
+                    }
+                    else
+                    {
+                        serversItem = outbound.settings.servers[0];
+                    }
+                    serversItem.address = node.address;
+                    serversItem.port = node.port;
+                    serversItem.password = node.id;
+                    serversItem.ota = false;
+                    serversItem.level = 1;
+
+                    boundStreamSettings(node, "out", outbound.streamSettings);
+
+                    outbound.protocol = "hysteria2";
+                    outbound.settings.vnext = null;
+                }
+                else if (node.configType == EConfigType.TUIC)
+                {
+                    ServersItem serversItem;
+                    if (outbound.settings.servers.Count <= 0)
+                    {
+                        serversItem = new ServersItem();
+                        outbound.settings.servers.Add(serversItem);
+                    }
+                    else
+                    {
+                        serversItem = outbound.settings.servers[0];
+                    }
+                    serversItem.address = node.address;
+                    serversItem.port = node.port;
+                    serversItem.password = node.id;
+                    serversItem.ota = false;
+                    serversItem.level = 1;
+
+                    boundStreamSettings(node, "out", outbound.streamSettings);
+
+                    outbound.protocol = "tuic";
+                    outbound.settings.vnext = null;
+                }
+                else if (node.configType == EConfigType.Mieru)
+                {
+                    ServersItem serversItem;
+                    if (outbound.settings.servers.Count <= 0)
+                    {
+                        serversItem = new ServersItem();
+                        outbound.settings.servers.Add(serversItem);
+                    }
+                    else
+                    {
+                        serversItem = outbound.settings.servers[0];
+                    }
+                    serversItem.address = node.address;
+                    serversItem.port = node.port;
+                    serversItem.password = node.id;
+                    serversItem.ota = false;
+                    serversItem.level = 1;
+
+                    boundStreamSettings(node, "out", outbound.streamSettings);
+
+                    outbound.protocol = "mieru";
+                    outbound.settings.vnext = null;
+                }
             }
             catch (Exception ex)
             {
