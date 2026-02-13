@@ -986,14 +986,69 @@ namespace v2rayN.Handler
                 configType = EConfigType.Mieru
             };
 
-            Uri url = new Uri(result.Replace("mieru://", "https://", StringComparison.OrdinalIgnoreCase));
+            result = result.TrimStart();
+            string urlPart = result.Substring("mieru://".Length);
+            
+            string remark = "";
+            int hashIndex = urlPart.IndexOf('#');
+            if (hashIndex >= 0)
+            {
+                remark = urlPart.Substring(hashIndex + 1);
+                urlPart = urlPart.Substring(0, hashIndex);
+            }
 
-            item.address = url.IdnHost;
-            item.port = url.Port;
-            item.remarks = url.GetComponents(UriComponents.Fragment, UriFormat.Unescaped);
-            item.id = url.UserInfo;
+            string queryPart = "";
+            int queryIndex = urlPart.IndexOf('?');
+            if (queryIndex >= 0)
+            {
+                queryPart = urlPart.Substring(queryIndex + 1);
+                urlPart = urlPart.Substring(0, queryIndex);
+            }
 
-            var query = HttpUtility.ParseQueryString(url.Query);
+            string userInfo = "";
+            int atIndex = urlPart.IndexOf('@');
+            if (atIndex >= 0)
+            {
+                userInfo = urlPart.Substring(0, atIndex);
+                urlPart = urlPart.Substring(atIndex + 1);
+            }
+
+            string address = "";
+            int port = 0;
+            if (urlPart.StartsWith("["))
+            {
+                int bracketEnd = urlPart.IndexOf(']');
+                if (bracketEnd >= 0)
+                {
+                    address = urlPart.Substring(1, bracketEnd - 1);
+                    string remaining = urlPart.Substring(bracketEnd + 1);
+                    if (remaining.StartsWith(":"))
+                    {
+                        int.TryParse(remaining.Substring(1), out port);
+                    }
+                }
+            }
+            else
+            {
+                int colonIndex = urlPart.LastIndexOf(':');
+                if (colonIndex >= 0)
+                {
+                    address = urlPart.Substring(0, colonIndex);
+                    string portStr = urlPart.Substring(colonIndex + 1);
+                    int.TryParse(portStr, out port);
+                }
+                else
+                {
+                    address = urlPart;
+                }
+            }
+
+            item.address = address;
+            item.port = port;
+            item.remarks = Uri.UnescapeDataString(remark);
+            item.id = userInfo;
+
+            var query = HttpUtility.ParseQueryString(queryPart);
             item.streamSecurity = query["security"] ?? "";
             item.sni = query["sni"] ?? "";
             item.alpn = Utils.String2List(Utils.UrlDecode(query["alpn"] ?? ""));
@@ -1051,14 +1106,69 @@ namespace v2rayN.Handler
                 configType = EConfigType.TUIC
             };
 
-            Uri url = new Uri(result.Replace("tuic://", "https://", StringComparison.OrdinalIgnoreCase));
+            result = result.TrimStart();
+            string urlPart = result.Substring("tuic://".Length);
+            
+            string remark = "";
+            int hashIndex = urlPart.IndexOf('#');
+            if (hashIndex >= 0)
+            {
+                remark = urlPart.Substring(hashIndex + 1);
+                urlPart = urlPart.Substring(0, hashIndex);
+            }
 
-            item.address = url.IdnHost;
-            item.port = url.Port;
-            item.remarks = url.GetComponents(UriComponents.Fragment, UriFormat.Unescaped);
-            item.id = url.UserInfo;
+            string queryPart = "";
+            int queryIndex = urlPart.IndexOf('?');
+            if (queryIndex >= 0)
+            {
+                queryPart = urlPart.Substring(queryIndex + 1);
+                urlPart = urlPart.Substring(0, queryIndex);
+            }
 
-            var query = HttpUtility.ParseQueryString(url.Query);
+            string userInfo = "";
+            int atIndex = urlPart.IndexOf('@');
+            if (atIndex >= 0)
+            {
+                userInfo = urlPart.Substring(0, atIndex);
+                urlPart = urlPart.Substring(atIndex + 1);
+            }
+
+            string address = "";
+            int port = 0;
+            if (urlPart.StartsWith("["))
+            {
+                int bracketEnd = urlPart.IndexOf(']');
+                if (bracketEnd >= 0)
+                {
+                    address = urlPart.Substring(1, bracketEnd - 1);
+                    string remaining = urlPart.Substring(bracketEnd + 1);
+                    if (remaining.StartsWith(":"))
+                    {
+                        int.TryParse(remaining.Substring(1), out port);
+                    }
+                }
+            }
+            else
+            {
+                int colonIndex = urlPart.LastIndexOf(':');
+                if (colonIndex >= 0)
+                {
+                    address = urlPart.Substring(0, colonIndex);
+                    string portStr = urlPart.Substring(colonIndex + 1);
+                    int.TryParse(portStr, out port);
+                }
+                else
+                {
+                    address = urlPart;
+                }
+            }
+
+            item.address = address;
+            item.port = port;
+            item.remarks = Uri.UnescapeDataString(remark);
+            item.id = userInfo;
+
+            var query = HttpUtility.ParseQueryString(queryPart);
             item.security = query["encryption"] ?? "";
             item.sni = query["sni"] ?? "";
             item.alpn = Utils.String2List(Utils.UrlDecode(query["alpn"] ?? ""));
