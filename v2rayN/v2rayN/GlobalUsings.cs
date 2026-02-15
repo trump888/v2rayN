@@ -1,34 +1,37 @@
-global using System;
-global using System.Collections;
-global using System.Collections.Generic;
-global using System.ComponentModel;
-global using System.Diagnostics;
-global using System.Globalization;
-global using System.IO;
-global using System.Linq;
-global using System.Reactive.Disposables.Fluent;
-global using System.Reactive.Linq;
-global using System.Runtime.InteropServices;
-global using System.Text;
-global using System.Threading;
-global using System.Threading.Tasks;
-global using System.Windows;
-global using System.Windows.Data;
-global using System.Windows.Input;
-global using System.Windows.Interop;
-global using System.Windows.Threading;
-global using DynamicData;
-global using DynamicData.Binding;
-global using ReactiveUI;
-global using ReactiveUI.Fody.Helpers;
-global using ServiceLib;
-global using ServiceLib.Base;
-global using ServiceLib.Common;
-global using ServiceLib.Enums;
-global using ServiceLib.Events;
-global using ServiceLib.Handler;
-global using ServiceLib.Manager;
-global using ServiceLib.Models;
-global using ServiceLib.Resx;
-global using ServiceLib.ViewModels;
-global using v2rayN.Common;
+// For .NET Framework 4.8 compatibility
+// These are regular using statements that will work in both net48 and net8.0
+
+// System namespaces
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Diagnostics;
+using System.Globalization;
+using System.IO;
+using System.Linq;
+using System.Runtime.InteropServices;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+
+// Reactive and DynamicData
+using System.Reactive.Disposables.Fluent;
+using System.Reactive.Linq;
+using DynamicData;
+using DynamicData.Binding;
+using ReactiveUI;
+using ReactiveUI.Fody.Helpers;
+
+// ServiceLib
+using ServiceLib;
+using ServiceLib.Base;
+using ServiceLib.Common;
+using ServiceLib.Enums;
+using ServiceLib.Events;
+using ServiceLib.Handler;
+using ServiceLib.Manager;
+using ServiceLib.Models;
+using ServiceLib.Resx;
+using ServiceLib.ViewModels;
+using v2rayN.Common;

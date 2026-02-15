@@ -13,9 +13,7 @@ on:
 
 env:
   OutputArch: "windows-64"
-  OutputArchArm: "windows-arm64"
-  OutputPath64:  "${{ github.workspace }}/v2rayN/Release/windows-64"
-  OutputPathArm64:  "${{ github.workspace }}/v2rayN/Release/windows-arm64"
+  OutputPath:  "${{ github.workspace }}/v2rayN/Release"
 
 jobs:
   build:
@@ -23,45 +21,50 @@ jobs:
       matrix:
         configuration: [Release]
 
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
 
     steps:
     - name: Checkout
       uses: actions/checkout@v6.0.2
-
-    - name: Setup
-      uses: actions/setup-dotnet@v5.0.1
       with:
-        dotnet-version: '8.0.x'
+        submodules: 'recursive'
 
-    - name: Build
+    - name: Setup NuGet
+      uses: NuGet/setup-nuget@v2
+
+    - name: Restore NuGet packages
       run: |
-        cd v2rayN 
-        dotnet publish ./v2rayN/v2rayN.csproj     -c Release -r win-x64   -p:SelfContained=true -p:EnableWindowsTargeting=true -o $OutputPath64
-        dotnet publish ./v2rayN/v2rayN.csproj     -c Release -r win-arm64 -p:SelfContained=true -p:EnableWindowsTargeting=true -o $OutputPathArm64
-        dotnet publish ./AmazTool/AmazTool.csproj -c Release -r win-x64   -p:SelfContained=true -p:EnableWindowsTargeting=true -p:PublishTrimmed=true -o $OutputPath64
-        dotnet publish ./AmazTool/AmazTool.csproj -c Release -r win-arm64 -p:SelfContained=true -p:EnableWindowsTargeting=true -p:PublishTrimmed=true -o $OutputPathArm64
-  
+        nuget restore v2rayN/v2rayN.sln
+
+    - name: Build v2rayN
+      run: |
+        dotnet build v2rayN/v2rayN/v2rayN.csproj -c Release -o "${{ env.OutputPath }}/v2rayN"
+
+    - name: Build AmazTool
+      run: |
+        dotnet build v2rayN/AmazTool/AmazTool.csproj -c Release -o "${{ env.OutputPath }}/AmazTool"
+   
     - name: Upload build artifacts
       uses: actions/upload-artifact@v6.0.0
       with:
         name: v2rayN-windows
         path: |
-          ${{ github.workspace }}/v2rayN/Release/windows*
+          ${{ env.OutputPath }}/**
     
     # release zip archive
     - name: Package release zip archive
       if: github.event.inputs.release_tag != ''
       run: |
-        chmod 755 package-release-zip.sh
-        ./package-release-zip.sh $OutputArch $OutputPath64
-        ./package-release-zip.sh $OutputArchArm $OutputPathArm64
+        cd v2rayN
+        mkdir -p Release
+        cp -r "${{ env.OutputPath }}"/* Release/
+        powershell -Command "Compress-Archive -Path 'Release/*' -DestinationPath 'v2rayN-windows.zip' -Force"
     
     - name: Upload zip archive to release
       uses: svenstaro/upload-release-action@v2
       if: github.event.inputs.release_tag != ''
       with:
-        file: ${{ github.workspace }}/v2rayN*.zip
+        file: v2rayN/v2rayN-windows.zip
         tag: ${{ github.event.inputs.release_tag }}
         file_glob: true
         prerelease: true
