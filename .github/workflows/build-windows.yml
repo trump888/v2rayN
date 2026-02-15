@@ -32,15 +32,30 @@ jobs:
     - name: Setup MSBuild
       uses: microsoft/setup-msbuild@v2
 
+    - name: Install NuGet CLI
+      run: |
+        choco install nuget.commandline -y
+
+    - name: Restore NuGet packages
+      run: |
+        nuget restore v2rayN/v2rayN/v2rayN.csproj -PackagesDirectory "${{ github.workspace }}/packages"
+        nuget restore v2rayN/ServiceLib/ServiceLib.csproj -PackagesDirectory "${{ github.workspace }}/packages"
+        nuget restore v2rayN/AmazTool/AmazTool.csproj -PackagesDirectory "${{ github.workspace }}/packages"
+
+    - name: Restore and Build ServiceLib
+      run: |
+        msbuild v2rayN/ServiceLib/ServiceLib.csproj /p:Configuration=Release /p:Platform="Any CPU" /p:RestorePackagesPath="${{ github.workspace }}/packages" /t:Restore /p:OutputPath="${{ env.OutputPath }}/ServiceLib"
+        msbuild v2rayN/ServiceLib/ServiceLib.csproj /p:Configuration=Release /p:Platform="Any CPU" /p:RestorePackagesPath="${{ github.workspace }}/packages" /t:Build /p:OutputPath="${{ env.OutputPath }}/ServiceLib"
+
     - name: Restore and Build v2rayN
       run: |
-        msbuild v2rayN/v2rayN/v2rayN.csproj /p:Configuration=Release /p:Platform="Any CPU" /t:Restore /p:OutputPath="${{ env.OutputPath }}/v2rayN"
-        msbuild v2rayN/v2rayN/v2rayN.csproj /p:Configuration=Release /p:Platform="Any CPU" /t:Build /p:OutputPath="${{ env.OutputPath }}/v2rayN"
+        msbuild v2rayN/v2rayN/v2rayN.csproj /p:Configuration=Release /p:Platform="Any CPU" /p:RestorePackagesPath="${{ github.workspace }}/packages" /t:Restore /p:OutputPath="${{ env.OutputPath }}/v2rayN"
+        msbuild v2rayN/v2rayN/v2rayN.csproj /p:Configuration=Release /p:Platform="Any CPU" /p:RestorePackagesPath="${{ github.workspace }}/packages" /t:Build /p:OutputPath="${{ env.OutputPath }}/v2rayN"
 
     - name: Restore and Build AmazTool
       run: |
-        msbuild v2rayN/AmazTool/AmazTool.csproj /p:Configuration=Release /p:Platform="Any CPU" /t:Restore /p:OutputPath="${{ env.OutputPath }}/AmazTool"
-        msbuild v2rayN/AmazTool/AmazTool.csproj /p:Configuration=Release /p:Platform="Any CPU" /t:Build /p:OutputPath="${{ env.OutputPath }}/AmazTool"
+        msbuild v2rayN/AmazTool/AmazTool.csproj /p:Configuration=Release /p:Platform="Any CPU" /p:RestorePackagesPath="${{ github.workspace }}/packages" /t:Restore /p:OutputPath="${{ env.OutputPath }}/AmazTool"
+        msbuild v2rayN/AmazTool/AmazTool.csproj /p:Configuration=Release /p:Platform="Any CPU" /p:RestorePackagesPath="${{ github.workspace }}/packages" /t:Build /p:OutputPath="${{ env.OutputPath }}/AmazTool"
    
     - name: Upload build artifacts
       uses: actions/upload-artifact@v6.0.0
