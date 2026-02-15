@@ -34,11 +34,13 @@ jobs:
 
     - name: Restore and Build v2rayN
       run: |
-        msbuild v2rayN/v2rayN/v2rayN.csproj /p:Configuration=Release /p:Platform="Any CPU" /t:Restore;Build /p:OutputPath="${{ env.OutputPath }}/v2rayN"
+        msbuild v2rayN/v2rayN/v2rayN.csproj /p:Configuration=Release /p:Platform="Any CPU" /t:Restore /p:OutputPath="${{ env.OutputPath }}/v2rayN"
+        msbuild v2rayN/v2rayN/v2rayN.csproj /p:Configuration=Release /p:Platform="Any CPU" /t:Build /p:OutputPath="${{ env.OutputPath }}/v2rayN"
 
     - name: Restore and Build AmazTool
       run: |
-        msbuild v2rayN/AmazTool/AmazTool.csproj /p:Configuration=Release /p:Platform="Any CPU" /t:Restore;Build /p:OutputPath="${{ env.OutputPath }}/AmazTool"
+        msbuild v2rayN/AmazTool/AmazTool.csproj /p:Configuration=Release /p:Platform="Any CPU" /t:Restore /p:OutputPath="${{ env.OutputPath }}/AmazTool"
+        msbuild v2rayN/AmazTool/AmazTool.csproj /p:Configuration=Release /p:Platform="Any CPU" /t:Build /p:OutputPath="${{ env.OutputPath }}/AmazTool"
    
     - name: Upload build artifacts
       uses: actions/upload-artifact@v6.0.0
