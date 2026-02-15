@@ -18,6 +18,8 @@
 
     <PropertyGroup Condition="'$(TargetFramework)' == 'net48'">
         <ImplicitUsings>false</ImplicitUsings>
+        <LangVersion>latest</LangVersion>
+        <Nullable>disable</Nullable>
     </PropertyGroup>
 
     <PropertyGroup Condition="'$(TargetFramework)' != 'net48'">
