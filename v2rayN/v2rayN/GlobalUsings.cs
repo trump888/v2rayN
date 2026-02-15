@@ -16,7 +16,8 @@ using System.Threading;
 using System.Threading.Tasks;
 
 // Reactive and DynamicData
-using System.Reactive.Disposables.Fluent;
+using System.Reactive;
+using System.Reactive.Disposables;
 using System.Reactive.Linq;
 using DynamicData;
 using DynamicData.Binding;

@@ -4,7 +4,6 @@ using System.Diagnostics;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
-using System.Net.WebProxy;
 using System.Reactive;
 using System.Reactive.Disposables;
 using System.Reactive.Linq;
