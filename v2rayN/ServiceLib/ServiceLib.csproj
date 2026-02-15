@@ -21,7 +21,6 @@
 		<PackageReference Include="TaskScheduler" />
 		<PackageReference Include="System.Text.Json" />
 		<PackageReference Include="System.Formats.Asn1" />
-		<PackageReference Include="System.Formats.Tar" />
 		<PackageReference Include="Downloader" />
 	</ItemGroup>
 
