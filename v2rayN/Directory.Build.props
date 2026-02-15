@@ -4,7 +4,16 @@
         <Version>7.18.0</Version>
     </PropertyGroup>
 
-    <PropertyGroup>
+    <!-- For .NET Framework 4.8, set these first -->
+    <PropertyGroup Condition="'$(TargetFramework)' == 'net48'">
+        <TargetFramework>net48</TargetFramework>
+        <ImplicitUsings>false</ImplicitUsings>
+        <LangVersion>latest</LangVersion>
+        <Nullable>disable</Nullable>
+    </PropertyGroup>
+
+    <!-- Default settings for other frameworks -->
+    <PropertyGroup Condition="'$(TargetFramework)' != 'net48'">
         <TargetFramework Condition="'$(TargetFramework)' == ''">net8.0</TargetFramework>
         <TargetLatestRuntimePatch>true</TargetLatestRuntimePatch>
         <CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>
@@ -14,15 +23,6 @@
         <PackageLicenseExpression>GPL-3.0</PackageLicenseExpression>
         <Copyright>Copyright © 2017-$([System.DateTime]::UtcNow.Year) $(Authors)</Copyright>
         <InvariantGlobalization>false</InvariantGlobalization>
-    </PropertyGroup>
-
-    <PropertyGroup Condition="'$(TargetFramework)' == 'net48'">
-        <ImplicitUsings>false</ImplicitUsings>
-        <LangVersion>latest</LangVersion>
-        <Nullable>disable</Nullable>
-    </PropertyGroup>
-
-    <PropertyGroup Condition="'$(TargetFramework)' != 'net48'">
         <ImplicitUsings>enable</ImplicitUsings>
     </PropertyGroup>
 
