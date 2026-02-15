@@ -8,7 +8,6 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<!-- Downloader removed - not compatible with .NET Framework 4.8 -->
 		<PackageReference Include="ReactiveUI" />
 		<PackageReference Include="ReactiveUI.WPF" />
 		<PackageReference Include="ReactiveUI.Fody" />
@@ -20,6 +19,10 @@
 		<PackageReference Include="CliWrap" />
 		<PackageReference Include="ZXing.Net.Bindings.SkiaSharp" />
 		<PackageReference Include="TaskScheduler" />
+		<PackageReference Include="System.Text.Json" />
+		<PackageReference Include="System.Formats.Asn1" />
+		<PackageReference Include="System.Formats.Tar" />
+		<PackageReference Include="Downloader" />
 	</ItemGroup>
 
 	<ItemGroup>
