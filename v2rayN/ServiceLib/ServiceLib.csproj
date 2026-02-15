@@ -9,9 +9,9 @@
 
 	<ItemGroup>
 		<!-- Downloader removed - not compatible with .NET Framework 4.8 -->
-		<PackageReference Include="ReactiveUI" Version="17.6.34" />
-		<PackageReference Include="ReactiveUI.WPF" Version="17.6.34" />
-		<PackageReference Include="ReactiveUI.Fody" Version="16.5.14" />
+		<PackageReference Include="ReactiveUI" />
+		<PackageReference Include="ReactiveUI.WPF" />
+		<PackageReference Include="ReactiveUI.Fody" />
 		<PackageReference Include="sqlite-net-pcl" />
 		<PackageReference Include="NLog" />
 		<PackageReference Include="WebDav.Client" />
