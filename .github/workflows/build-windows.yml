@@ -29,20 +29,16 @@ jobs:
       with:
         submodules: 'recursive'
 
-    - name: Setup NuGet
-      uses: NuGet/setup-nuget@v2
+    - name: Setup MSBuild
+      uses: microsoft/setup-msbuild@v2
 
-    - name: Restore NuGet packages
+    - name: Restore and Build v2rayN
       run: |
-        nuget restore v2rayN/v2rayN.sln
+        msbuild v2rayN/v2rayN/v2rayN.csproj /p:Configuration=Release /p:Platform="Any CPU" /t:Restore;Build /p:OutputPath="${{ env.OutputPath }}/v2rayN"
 
-    - name: Build v2rayN
+    - name: Restore and Build AmazTool
       run: |
-        dotnet build v2rayN/v2rayN/v2rayN.csproj -c Release -o "${{ env.OutputPath }}/v2rayN"
-
-    - name: Build AmazTool
-      run: |
-        dotnet build v2rayN/AmazTool/AmazTool.csproj -c Release -o "${{ env.OutputPath }}/AmazTool"
+        msbuild v2rayN/AmazTool/AmazTool.csproj /p:Configuration=Release /p:Platform="Any CPU" /t:Restore;Build /p:OutputPath="${{ env.OutputPath }}/AmazTool"
    
     - name: Upload build artifacts
       uses: actions/upload-artifact@v6.0.0
@@ -55,16 +51,13 @@ jobs:
     - name: Package release zip archive
       if: github.event.inputs.release_tag != ''
       run: |
-        cd v2rayN
-        mkdir -p Release
-        cp -r "${{ env.OutputPath }}"/* Release/
-        powershell -Command "Compress-Archive -Path 'Release/*' -DestinationPath 'v2rayN-windows.zip' -Force"
+        powershell -Command "Compress-Archive -Path '${{ env.OutputPath }}/*' -DestinationPath 'v2rayN-windows.zip' -Force"
     
     - name: Upload zip archive to release
       uses: svenstaro/upload-release-action@v2
       if: github.event.inputs.release_tag != ''
       with:
-        file: v2rayN/v2rayN-windows.zip
+        file: v2rayN-windows.zip
         tag: ${{ github.event.inputs.release_tag }}
         file_glob: true
         prerelease: true
