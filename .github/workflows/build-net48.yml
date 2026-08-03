@@ -105,6 +105,9 @@ jobs:
         shell: pwsh
         working-directory: ./v2rayN
         run: |
+          # ServiceLib.UdpTest ProjectReference has Condition="'$(BuildNet48)' == 'true'"
+          # which evaluates to false by default, so UdpTest is skipped automatically.
+          # No need to pass any extra flags.
           dotnet restore v2rayN.sln
           if ($LASTEXITCODE -ne 0) {
             Write-Host "dotnet restore failed, trying msbuild -t:Restore"
