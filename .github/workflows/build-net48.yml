@@ -1,0 +1,294 @@
+name: build net48 (Win7/Win10 lightweight)
+
+# =============================================================================
+# Build v2rayN 7.24.4 as a .NET Framework 4.8 WPF application.
+#
+# Runs on windows-latest (free for public repos). Produces a framework-dependent
+# zip that runs on Win7 SP1 / Win10 / Win11 (target machine must have
+# .NET Framework 4.8 installed; Win10 1709+ ships with it).
+#
+# Triggers:
+#   - push to master       : build + upload artifact (no release)
+#   - workflow_dispatch    : manual trigger; if `release_tag` is provided,
+#                            also creates a GitHub Release with the zip
+#   - schedule             : nightly build at 02:00 UTC to catch upstream
+# =============================================================================
+
+on:
+  push:
+    branches: [ master ]
+    paths:
+      - 'v2rayN/**'
+      - '.github/workflows/build-net48.yml'
+      - 'net48-patches/**'
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Tag to publish as (e.g. 7.24.4-net48). Leave empty for build-only.'
+        required: false
+        type: string
+      use_release_source:
+        description: 'Check out a stable release tag instead of HEAD (recommended)'
+        required: false
+        type: boolean
+        default: true
+      release_version:
+        description: 'Upstream release tag to build from (e.g. 7.24.4)'
+        required: false
+        type: string
+        default: '7.24.4'
+  schedule:
+    - cron: '0 2 * * *'   # nightly at 02:00 UTC
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  build:
+    name: build net48 x64
+    runs-on: windows-latest
+
+    steps:
+      - name: Configure git (longpaths)
+        run: git config --global core.longpaths true
+
+      - name: Checkout (fork HEAD)
+        if: inputs.use_release_source != true
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Checkout (upstream release tag)
+        if: inputs.use_release_source == true
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+          ref: ${{ inputs.release_version || '7.24.4' }}
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Setup .NET SDK 8 (for NuGet restore & some build tools)
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Add .NET Framework 4.8 Developer Pack check
+        shell: pwsh
+        run: |
+          # windows-latest already has .NET Framework 4.8 SDK + Developer Pack
+          # Verify reference assemblies are present
+          $refPath = "${env:ProgramFiles(x86)}\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.8"
+          if (-not (Test-Path $refPath)) {
+            Write-Error "NET Framework 4.8 reference assemblies not found at $refPath"
+            exit 1
+          }
+          Write-Host "✓ NET Framework 4.8 reference assemblies available"
+          Get-ChildItem "$refPath\*.dll" | Measure-Object | ForEach-Object {
+            Write-Host "  Reference assemblies count: $($_.Count)"
+          }
+
+      - name: Apply net48 patches
+        shell: pwsh
+        run: |
+          Write-Host "=== Applying net48 port patches ==="
+          & ./net48-patches/scripts/apply-patches.ps1 -SourceDir ./v2rayN
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Patch application failed"
+            exit 1
+          }
+
+      - name: Restore NuGet packages
+        shell: pwsh
+        working-directory: ./v2rayN
+        run: |
+          dotnet restore v2rayN.sln
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "dotnet restore failed, trying msbuild -t:Restore"
+            msbuild v2rayN.sln -t:Restore -p:Configuration=Release
+          }
+
+      - name: Build Solution (Release, x64)
+        shell: pwsh
+        working-directory: ./v2rayN
+        run: |
+          Write-Host "=== Building v2rayN-net48 (Release) ==="
+          msbuild v2rayN.sln `
+            -p:Configuration=Release `
+            -p:Platform="Any CPU" `
+            -p:TargetFramework=net48 `
+            -m `
+            -v:minimal `
+            -clp:Summary
+
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Build failed"
+            exit 1
+          }
+
+      - name: Collect build outputs
+        shell: pwsh
+        run: |
+          $out = "publish-net48"
+          New-Item -ItemType Directory -Force -Path $out | Out-Null
+
+          # Main exe + dlls
+          $binDir = "./v2rayN/v2rayN/bin/Release/net48"
+          if (Test-Path $binDir) {
+            Copy-Item "$binDir/*" $out -Recurse -Force
+          } else {
+            Write-Error "Build output not found: $binDir"
+            exit 1
+          }
+
+          # AmazTool (upgrade helper)
+          $amazBin = "./v2rayN/AmazTool/bin/Release/net48"
+          if (Test-Path $amazBin) {
+            Copy-Item "$amazBin/AmazTool.exe" $out -Force
+          }
+
+          # Sample / Resources (if not embedded)
+          # (already embedded as EmbeddedResource in ServiceLib.dll)
+
+          Get-ChildItem $out | Format-Table Name, Length -AutoSize
+          Write-Host "Total size: $((Get-ChildItem $out -Recurse | Measure-Object Length -Sum).Sum / 1MB) MB"
+
+      - name: Download xray/sing-box cores (optional)
+        shell: pwsh
+        run: |
+          # Download cores matching the upstream v2rayN-core-bin repository
+          # so the produced zip is immediately usable.
+          $bin = "publish-net48/bin"
+          New-Item -ItemType Directory -Force -Path $bin/xray, $bin/sing_box | Out-Null
+
+          $ProgressPreference = "SilentlyContinue"
+
+          # Xray-core latest stable
+          $xrayLatest = (Invoke-RestMethod "https://api.github.com/repos/XTLS/Xray-core/releases/latest").tag_name
+          $xrayVer = $xrayLatest.TrimStart('v')
+          Write-Host "Downloading Xray-core $xrayVer..."
+          Invoke-WebRequest "https://github.com/XTLS/Xray-core/releases/download/v$xrayVer/Xray-windows-64.zip" -OutFile xray.zip
+          Expand-Archive -Force xray.zip xray-extracted
+          Copy-Item xray-extracted/xray.exe "$bin/xray/" -Force
+          Copy-Item xray-extracted/geoip.dat "$bin/xray/" -Force
+          Copy-Item xray-extracted/geosite.dat "$bin/xray/" -Force
+
+          # sing-box latest stable
+          $singLatest = (Invoke-RestMethod "https://api.github.com/repos/SagerNet/sing-box/releases/latest").tag_name
+          $singVer = $singLatest.TrimStart('v')
+          Write-Host "Downloading sing-box $singVer..."
+          Invoke-WebRequest "https://github.com/SagerNet/sing-box/releases/download/v$singVer/sing-box-$singVer-windows-amd64.zip" -OutFile singbox.zip
+          Expand-Archive -Force singbox.zip singbox-extracted
+          $singExe = Get-ChildItem singbox-extracted -Recurse -Filter "sing-box.exe" | Select-Object -First 1
+          Copy-Item $singExe.FullName "$bin/sing_box/" -Force
+          $cronet = Get-ChildItem singbox-extracted -Recurse -Filter "libcronet*.dll" | Select-Object -First 1
+          if ($cronet) { Copy-Item $cronet.FullName "$bin/sing_box/libcronet.dll" -Force }
+
+          # GeoSite / GeoIP for sing-box SRS rules
+          New-Item -ItemType Directory -Force -Path "$bin/srss" | Out-Null
+          $srss = @(
+            "geoip-cn.srs", "geoip-private.srs",
+            "geosite-cn.srs", "geosite-gfw.srs", "geosite-google.srs",
+            "geosite-private.srs", "geosite-category-ads-all.srs"
+          )
+          foreach ($s in $srss) {
+            try {
+              Invoke-WebRequest "https://raw.githubusercontent.com/2dust/sing-box-rules/refs/heads/rule-set-geoip/$s" -OutFile "$bin/srss/$s" -ErrorAction Stop
+            } catch {
+              try {
+                Invoke-WebRequest "https://raw.githubusercontent.com/2dust/sing-box-rules/refs/heads/rule-set-geosite/$s" -OutFile "$bin/srss/$s"
+              } catch { Write-Host "  $s not found (skipped)" }
+            }
+          }
+
+      - name: Create startup batch file
+        shell: pwsh
+        run: |
+          # Make it easy for users: double-click v2rayN-net48.bat to launch.
+          # Ensures .NET Framework 4.8 is installed.
+          @'
+          @echo off
+          REM v2rayN .NET Framework 4.8 launcher
+          REM Requires: Windows 7 SP1 / Windows 10 / Windows 11 with .NET Framework 4.8
+
+          reg query "HKLM\SOFTWARE\Microsoft\NET Framework Setup\NDP\v4\Full" /v Release 2>nul | findstr "528040" >nul
+          if errorlevel 1 (
+              echo .NET Framework 4.8 is not installed.
+              echo Download from: https://dotnet.microsoft.com/download/dotnet-framework/net48
+              pause
+              exit /b 1
+          )
+
+          start "" "%~dp0v2rayN.exe"
+          '@ | Out-File -FilePath publish-net48/v2rayN-net48.bat -Encoding ASCII
+
+      - name: Zip artifact
+        shell: pwsh
+        run: |
+          $ver = "${{ inputs.release_version || 'master' }}"
+          if ($ver -eq "") { $ver = "master" }
+          $zipName = "v2rayN-windows-net48-x64.zip"
+          Compress-Archive -Path "publish-net48/*" -DestinationPath $zipName -Force
+          Write-Host "Created $zipName ($((Get-Item $zipName).Length / 1MB) MB)"
+
+          # Save version info
+          "Build: $ver" | Out-File -FilePath build-info.txt
+          "Date: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss UTC')" | Out-File -FilePath build-info.txt -Append
+          "Commit: ${{ github.sha }}" | Out-File -FilePath build-info.txt -Append
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: v2rayN-windows-net48-x64
+          path: |
+            v2rayN-windows-net48-x64.zip
+            build-info.txt
+          retention-days: 30
+          compression-level: 0   # already zipped
+
+      - name: Create GitHub Release
+        if: github.event_name == 'workflow_dispatch' && inputs.release_tag != ''
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $tag = "${{ inputs.release_tag }}"
+          Write-Host "Creating release $tag"
+
+          $notes = @"
+          # v2rayN $tag (.NET Framework 4.8 port)
+
+          Built from upstream ${{ inputs.release_version || 'master' }}.
+
+          ## System Requirements
+
+          - Windows 7 SP1 / Windows 10 / Windows 11 (x64)
+          - .NET Framework 4.8 ([download](https://dotnet.microsoft.com/download/dotnet-framework/net48))
+
+          ## Install
+
+          1. Extract the zip to a folder (e.g. ``C:\v2rayN``)
+          2. Double-click ``v2rayN-net48.bat`` (or ``v2rayN.exe`` directly)
+          3. Cores (xray + sing-box) are bundled in ``bin\``
+
+          ## Differences from upstream release
+
+          - Target framework: ``net48`` instead of ``net10.0-windows``
+          - Self-contained: NO (requires .NET Framework 4.8 on target machine)
+          - Single-file: NO (folder with multiple DLLs)
+          - UDP test feature: stubbed out (returns -1)
+          - Tar extraction: not supported
+          - CertificateChainPolicy: ignored (uses system trust store)
+
+          See ``build-info.txt`` for full build metadata.
+          "@
+
+          gh release create $tag `
+            v2rayN-windows-net48-x64.zip `
+            build-info.txt `
+            --title "v2rayN $tag (net48 port)" `
+            --notes $notes `
+            --prerelease
