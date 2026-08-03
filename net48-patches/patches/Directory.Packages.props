@@ -1,0 +1,87 @@
+<Project>
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+    <CentralPackageVersionOverrideEnabled>false</CentralPackageVersionOverrideEnabled>
+  </PropertyGroup>
+
+  <!-- =============================================================== -->
+  <!-- NET48 PORT: every package re-targeted to its last net48-capable -->
+  <!-- release. Verified against nuget.org "Frameworks" tab as of      -->
+  <!-- 2026-08.                                                        -->
+  <!--                                                                  -->
+  <!-- DOWNGRADES:                                                      -->
+  <!--   ReactiveUI           23.2.28  -> 18.6.5   (last net48 line)   -->
+  <!--   ReactiveUI.WPF       23.2.28  -> 18.6.5                       -->
+  <!--   ReactiveUI.Fody      19.5.41  -> 18.6.5                       -->
+  <!--   MaterialDesignThemes 5.3.2   -> 3.2.0    (last net48 line)   -->
+  <!--   H.NotifyIcon.Wpf     2.4.1   -> 2.4.1   (already net48-ok)    -->
+  <!--   Downloader           5.9.5   -> 3.3.2   (last net48 line)    -->
+  <!--   ZXing.Net.Bindings.SkiaSharp 0.16.22 -> 0.16.14               -->
+  <!--   NLog                 6.1.4   -> 5.3.4   (6.x dropped net48)  -->
+  <!--                                                                  -->
+  <!-- ADDS (net48 polyfills):                                          -->
+  <!--   System.Text.Json       9.0.7                                   -->
+  <!--   System.Memory          4.6.3                                   -->
+  <!--   System.Threading.Channels 8.0.0                                -->
+  <!--   System.Index           4.7.1                                   -->
+  <!--   System.Range           4.7.1                                   -->
+  <!--                                                                  -->
+  <!-- REMOVED:                                                         -->
+  <!--   Avalonia.*          (Desktop project deleted entirely)        -->
+  <!--   Semi.Avalonia.*                                                  -->
+  <!--   DialogHost.Avalonia                                              -->
+  <!--   AvaloniaUI.DiagnosticsSupport                                    -->
+  <!-- =============================================================== -->
+  <ItemGroup>
+    <!-- Avalonia stack removed: Win7/Win10 builds use the WPF frontend only. -->
+    <!--
+    <PackageVersion Include="Avalonia.AvaloniaEdit" Version="12.0.0" />
+    <PackageVersion Include="Avalonia.Controls.DataGrid" Version="12.1.0" />
+    <PackageVersion Include="Avalonia.Desktop" Version="12.1.0" />
+    <PackageVersion Include="AvaloniaUI.DiagnosticsSupport" Version="2.2.3" />
+    <PackageVersion Include="DialogHost.Avalonia" Version="0.12.3" />
+    <PackageVersion Include="ReactiveUI.Avalonia" Version="12.0.3" />
+    <PackageVersion Include="Semi.Avalonia" Version="12.1.0" />
+    <PackageVersion Include="Semi.Avalonia.AvaloniaEdit" Version="12.0.0" />
+    <PackageVersion Include="Semi.Avalonia.DataGrid" Version="12.1.0" />
+    -->
+
+    <!-- Test stack: pin to last xunit that supports net48 -->
+    <PackageVersion Include="AwesomeAssertions" Version="6.12.0" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="2.8.2" />
+    <PackageVersion Include="xunit.v3" Version="1.0.1" />
+
+    <!-- Library stack -->
+    <PackageVersion Include="CliWrap" Version="3.6.0" />
+    <PackageVersion Include="Downloader" Version="3.0.6" />
+    <PackageVersion Include="H.NotifyIcon.Wpf" Version="2.4.1" />
+    <PackageVersion Include="IPNetwork2" Version="4.3.0" />
+    <PackageVersion Include="MaterialDesignThemes" Version="3.2.0" />
+    <PackageVersion Include="NLog" Version="5.3.4" />
+    <PackageVersion Include="QRCoder" Version="1.6.0" />
+    <PackageVersion Include="ReactiveUI" Version="18.4.44" />
+    <PackageVersion Include="ReactiveUI.Fody" Version="18.4.44" />
+    <PackageVersion Include="ReactiveUI.WPF" Version="18.4.44" />
+    <PackageVersion Include="sqlite-net-e" Version="1.11.285" />
+    <PackageVersion Include="Repobot.SQLite.Unofficial" Version="3.53.3.10" />
+    <PackageVersion Include="TaskScheduler" Version="2.11.0" />
+    <PackageVersion Include="WebDav.Client" Version="2.8.0" />
+    <PackageVersion Include="YamlDotNet" Version="13.7.1" />
+    <PackageVersion Include="ZXing.Net.Bindings.SkiaSharp" Version="0.16.14" />
+    <PackageVersion Include="SkiaSharp.NativeAssets.Linux" Version="2.88.9" />
+
+    <!-- net48 polyfills for net8+ BCL surface used by the codebase.          -->
+    <!-- NOTE: System.Index / System.Range are NOT separate NuGet packages;   -->
+    <!-- they are built-in types in System.Runtime in net48 + C# 9 reference  -->
+    <!-- assemblies (provided by Microsoft.NETFramework.ReferenceAssemblies). -->
+    <PackageVersion Include="System.Text.Json" Version="9.0.7" />
+    <PackageVersion Include="System.Memory" Version="4.6.3" />
+    <PackageVersion Include="System.Threading.Channels" Version="8.0.0" />
+    <PackageVersion Include="Microsoft.Bcl.AsyncInterfaces" Version="9.0.7" />
+    <PackageVersion Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" />
+    <PackageVersion Include="System.Buffers" Version="4.6.1" />
+    <PackageVersion Include="System.Net.Http" Version="4.3.4" />
+  </ItemGroup>
+</Project>

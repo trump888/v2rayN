@@ -1,0 +1,64 @@
+<Project>
+
+    <PropertyGroup>
+        <Version>7.24.4-net48</Version>
+    </PropertyGroup>
+
+    <!-- =========================================================== -->
+    <!-- NET48 PORT: changed from net10.0 -> net48                    -->
+    <!-- C# language version pinned to 9.0 (the highest that works    -->
+    <!-- reliably on net48 SDK-style projects).                       -->
+    <!--                                                              -->
+    <!-- Records / init-setters / nullable annotations still work     -->
+    <!-- via the IsExternalInit shim in ServiceLib/Common/.           -->
+    <!-- =========================================================== -->
+    <PropertyGroup>
+        <TargetFramework>net48</TargetFramework>
+        <!-- C# 12 needed for `collection expressions` (`["a", "b"]`) used   -->
+        <!-- throughout v2rayN source. C# 12 works on net48 with .NET SDK 8+  -->
+        <!-- (Roslyn 4.8+).                                                    -->
+        <LangVersion>12.0</LangVersion>
+        <CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>
+        <Nullable>annotations</Nullable>
+        <!-- Original v2rayN uses `<ImplicitUsings>enable</ImplicitUsings>` in    -->
+        <!-- net10. Their GlobalUsings.cs files only add a few extras on top of -->
+        <!-- the SDK-default implicit usings (System, System.Collections.Generic, -->
+        <!-- System.Threading.Tasks, System.IO, System.Linq, etc.). On net48 we  -->
+        <!-- must keep this enabled so the same source files compile unmodified. -->
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Authors>2dust (net48 port)</Authors>
+        <PackageLicenseExpression>GPL-3.0</PackageLicenseExpression>
+        <Copyright>Copyright © 2017-$([System.DateTime]::UtcNow.Year)</Copyright>
+        <InvariantGlobalization>false</InvariantGlobalization>
+    </PropertyGroup>
+
+    <!-- Linux/macOS need this package to provide net48 reference assemblies -->
+    <!-- (System.Threading.Tasks, System.IO, System.Collections.Generic etc.) -->
+    <!-- On Windows + VS 2022 with .NET Framework 4.8 Dev Pack installed, this -->
+    <!-- is redundant but harmless.                                            -->
+    <ItemGroup>
+        <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" PrivateAssets="All" />
+        <!-- System.Buffers is needed by ServiceLib.UdpTest's GlobalUsings.cs   -->
+        <!-- (uses System.Buffers.Binary). On net48 it's a separate facade DLL, -->
+        <!-- so we add it globally to cover all subprojects.                    -->
+        <PackageReference Include="System.Buffers" />
+        <!-- System.Memory provides Span<T> / ReadOnlySpan<T> on net48.         -->
+        <PackageReference Include="System.Memory" />
+        <!-- System.Net.Http provides HttpClient/HttpClientHandler on net48     -->
+        <!-- (the System.Net.Http.dll that ships with net48 lacks newer APIs).  -->
+        <PackageReference Include="System.Net.Http" />
+    </ItemGroup>
+
+    <!-- net48 does NOT support single-file publish / ready-to-run the same -->
+    <!-- way net8+ does. Strip the net10-specific Release properties.        -->
+    <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+        <DebugType>embedded</DebugType>
+        <EventSourceSupport>false</EventSourceSupport>
+        <StackTraceSupport>false</StackTraceSupport>
+        <MetricsSupport>false</MetricsSupport>
+        <MetadataUpdaterSupport>false</MetadataUpdaterSupport>
+        <EnableUnsafeBinaryFormatterSerialization>false</EnableUnsafeBinaryFormatterSerialization>
+        <EnableUnsafeUTF7Encoding>false</EnableUnsafeUTF7Encoding>
+        <UseSystemResourceKeys>true</UseSystemResourceKeys>
+    </PropertyGroup>
+</Project>
