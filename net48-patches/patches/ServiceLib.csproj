@@ -97,15 +97,8 @@
         </ItemGroup>
 
         <ItemGroup>
-                <!-- NET48 PORT: ServiceLib.UdpTest was disabled because it uses      -->
-                <!-- .NET 5+ Stream/UdpClient extension APIs (ReadAsync(Memory<byte>), -->
-                <!-- ReceiveAsync(CancellationToken), MemoryStream.Write(byte[]))      -->
-                <!-- that require manual porting. The UDP test feature is non-        -->
-                <!-- essential for core proxy operation. To re-enable, port those    -->
-                <!-- ~30 call sites in ServiceLib.UdpTest/Socks5UdpChannel.cs.        -->
-                <!--
-                <ProjectReference Include="..\ServiceLib.UdpTest\ServiceLib.UdpTest.csproj" />
-                -->
+                <!-- NET48 PORT: ServiceLib.UdpTest disabled (requires .NET 5+ Stream/Udp APIs). Use Condition=false instead of comment to keep MSBuild XML parser happy. -->
+                <ProjectReference Include="..\ServiceLib.UdpTest\ServiceLib.UdpTest.csproj" Condition="'$(BuildNet48)' == 'true'" />
         </ItemGroup>
 
 </Project>

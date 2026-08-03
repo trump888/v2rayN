@@ -36,17 +36,22 @@ function Patch-File {
 }
 
 # ---------------------------------------------------------------------------
-# Patch 1: ServiceLib.csproj — comment out ServiceLib.UdpTest ProjectReference
+# Patch 1: ServiceLib.csproj — disable ServiceLib.UdpTest ProjectReference
+# We use Condition="'$(BuildNet48)' == 'true'" instead of XML comment,
+# because MSBuild's XML parser sometimes chokes on comments containing
+# XML-like content (the <ProjectReference ...> tag inside the comment).
 # ---------------------------------------------------------------------------
 $udpTestRef = 'ServiceLib.UdpTest\ServiceLib.UdpTest.csproj'
 $serviceLibCsproj = Join-Path $SourceDir "ServiceLib/ServiceLib.csproj"
 if (Test-Path $serviceLibCsproj) {
     $content = Get-Content $serviceLibCsproj -Raw -Encoding UTF8
-    if ($content -match [regex]::Escape($udpTestRef) -and $content -notmatch 'NET48 PORT: UdpTest disabled') {
+    # Detect un-disabled UdpTest reference (no Condition attribute)
+    if ($content -match '<ProjectReference\s+Include="\.\.\\ServiceLib\.UdpTest\\ServiceLib\.UdpTest\.csproj"\s*/>' -and
+        $content -notmatch 'NET48 PORT: UdpTest disabled') {
         $new = $content -replace
             '<ProjectReference Include="\.\.\\ServiceLib\.UdpTest\\ServiceLib\.UdpTest\.csproj"\s*/>',
             '<!-- NET48 PORT: UdpTest disabled (requires .NET 5+ Stream/Udp APIs) -->
-                <!-- <ProjectReference Include="..\ServiceLib.UdpTest\ServiceLib.UdpTest.csproj" /> -->'
+                <ProjectReference Include="..\ServiceLib.UdpTest\ServiceLib.UdpTest.csproj" Condition="''$(BuildNet48)'' == ''true''" />'
         if ($new -ne $content) {
             [System.IO.File]::WriteAllText($serviceLibCsproj, $new, [System.Text.UTF8Encoding]::new($false))
             Write-Host "  > Patched ServiceLib.csproj (disabled UdpTest ref)" -ForegroundColor Green
