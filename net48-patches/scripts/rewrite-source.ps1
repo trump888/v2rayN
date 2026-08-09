@@ -364,6 +364,45 @@ foreach ($f in $csFiles) {
         $content = $content -replace "(?m)^\s*CustomTrustStore\s*=\s*new[^,]+,\s*$", "// net48: CustomTrustStore not available in initializer"
         $changed = $true
     }
+    # chainPolicy.CustomTrustStore.AddRange(certs) -> chainPolicy.AddToCustomTrustStore(certs)
+    if ($content -match 'CustomTrustStore\.AddRange') {
+        $content = $content -replace '(\w+)\.CustomTrustStore\.AddRange\(', '$1.AddToCustomTrustStore('
+        $changed = $true
+    }
+    # chain.ChainElements.Select(...) -> chain.ChainElements.AsEnumerable().Select(...)
+    if ($content -match 'ChainElements\.Select') {
+        $content = $content -replace 'ChainElements\.Select\(', 'ChainElements.AsEnumerable().Select('
+        $changed = $true
+    }
+    # Chunk(2).Select(c => new string(c)) -> Chunk(2).Select(c => c)
+    if ($content -match 'Chunk\(2\)\.Select\(c\s*=>\s*new string\(c\)\)') {
+        $content = $content -replace 'Chunk\(2\)\.Select\(c\s*=>\s*new string\(c\)\)', 'Chunk(2).Select(c => c)'
+        $changed = $true
+    }
+    # DownloaderHelper/DownloadService/ConnectionHandler: strip unsupported
+    # HttpClientHandler properties (statement form: anyVar.Prop = value;)
+    if ($f.Name -match 'DownloaderHelper|DownloadService|ConnectionHandler|HttpClientHelper') {
+        $stripProps = @('MaxConnectionsPerServer', 'PooledConnectionIdleTimeout', 'PooledConnectionLifetime',
+                        'EnableMultipleHttp2Connections', 'ConnectTimeout', 'Expect100ContinueTimeout',
+                        'KeepAlivePingTimeout', 'KeepAlivePingPolicy', 'SslOptions')
+        foreach ($prop in $stripProps) {
+            # Statement form: anyVar.Prop = value;
+            $content = $content -replace "(?m)^\s*\w+\.$prop\s*=\s*[^;]+;\s*$", "            /* net48: $prop */"
+            # anyVar.SslOptions.subProp = value;
+            $content = $content -replace "(?m)^\s*\w+\.SslOptions\.[^;]+;\s*$", "            /* net48: SslOptions */"
+            # Initializer form: Prop = value, -> delete line
+            $content = $content -replace "(?m)^\s*$prop\s*=\s*[^,\r\n]+,?\s*$", ""
+        }
+        $stripConfigProps = @('BlockTimeout', 'MaxTryAgainOnFailure', 'CustomHttpMessageHandlerFactory')
+        foreach ($prop in $stripConfigProps) {
+            $content = $content -replace "(?m)^\s*\w+\.$prop\s*=\s*[^;]+;\s*$", "            /* net48: $prop */"
+            $content = $content -replace "(?m)^\s*$prop\s*=\s*[^,\r\n]+,?\s*$", ""
+        }
+        # ConnectTimeout / KeepAliveTimeout in initializer form
+        $content = $content -replace "(?m)^\s*ConnectTimeout\s*=\s*[^,;\r\n]+,?\s*$", ""
+        $content = $content -replace "(?m)^\s*KeepAliveTimeout\s*=\s*[^,;\r\n]+,?\s*$", ""
+        $changed = $true
+    }
 
     # string.Join(char, IEnumerable<string>) — net48 only has Join(string, IEnumerable<string>)
     # Convert char literal to string literal: string.Join(',', ... -> string.Join(",", ...
