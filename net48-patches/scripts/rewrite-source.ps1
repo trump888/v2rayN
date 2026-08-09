@@ -554,5 +554,29 @@ foreach ($f in $csFiles) {
 #     }
 # }
 
+# ---------------------------------------------------------------------------
+# Rewrite 18: MaterialDesign 5.x-only XAML attributes — delete them
+# MaterialDesignThemes 3.2.0 (net48) lacks NavigationRailAssist.ShowSelectionBackground
+# ---------------------------------------------------------------------------
+$xamlFiles = Get-ChildItem -Path $SourceDir -Recurse -Filter "*.xaml" |
+    Where-Object { $_.FullName -notmatch "\\(obj|bin)\\" }
+
+foreach ($f in $xamlFiles) {
+    $content = Get-Content $f.FullName -Raw -Encoding UTF8
+    $changed = $false
+
+    # Delete materialDesign:NavigationRailAssist.ShowSelectionBackground="True"
+    if ($content -match 'NavigationRailAssist\.ShowSelectionBackground') {
+        $content = $content -replace '(?m)^\s*materialDesign:NavigationRailAssist\.ShowSelectionBackground="[^"]*"\s*\r?\n', ''
+        $changed = $true
+    }
+
+    if ($changed) {
+        [System.IO.File]::WriteAllText($f.FullName, $content, [System.Text.UTF8Encoding]::new($false))
+        $rewriteCount++
+        Write-Host "    patched XAML NavigationRailAssist: $($f.Name)"
+    }
+}
+
 Write-Host "  Total rewrites: $rewriteCount files touched"
 exit 0
