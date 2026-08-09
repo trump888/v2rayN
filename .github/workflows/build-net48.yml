@@ -119,12 +119,15 @@ jobs:
         working-directory: ./v2rayN
         run: |
           Write-Host "=== Building v2rayN-net48 (Release) ==="
+          # -m:1 disables parallel build to avoid .resources file lock contention
+          # between ServiceLib and ServiceLib.Tests (both write to obj/Release/net48/)
           msbuild v2rayN.sln `
             -p:Configuration=Release `
             -p:Platform="Any CPU" `
             -p:TargetFramework=net48 `
-            -m `
+            -m:1 `
             -v:minimal `
+            -nologo `
             -clp:Summary
 
           if ($LASTEXITCODE -ne 0) {
