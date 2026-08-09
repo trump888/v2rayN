@@ -153,33 +153,11 @@ foreach ($f in $csFiles) {
 }
 
 # ---------------------------------------------------------------------------
-# Rewrite 11: array range slice arr[1..n] -> arr.Skip(1).ToArray()
+# Rewrite 11: DISABLED — was rewriting arr[1..] to arr.Skip(1).ToArray()
+# which breaks STRING slicing (string.Skip(1).ToArray() = char[], not string).
+# Let the compiler handle Range natively via our Index/Range polyfills.
 # ---------------------------------------------------------------------------
-foreach ($f in $csFiles) {
-    $content = Get-Content $f.FullName -Raw -Encoding UTF8
-    $changed = $false
-
-    $pattern = '(\w+)\[(\d+)\.\.(\w+)\.Length\]'
-    while ($content -match $pattern) {
-        $content = $content -replace $pattern, '$1.Skip($2).ToArray()'
-        $changed = $true
-    }
-    $pattern2 = '(\w+)\[(\d+)\.\.\]'
-    while ($content -match $pattern2) {
-        $content = $content -replace $pattern2, '$1.Skip($2).ToArray()'
-        $changed = $true
-    }
-    $pattern3 = '(\w+)\[\.\.(\d+)\]'
-    while ($content -match $pattern3) {
-        $content = $content -replace $pattern3, '$1.Take($2).ToArray()'
-        $changed = $true
-    }
-    if ($changed) {
-        [System.IO.File]::WriteAllText($f.FullName, $content, [System.Text.UTF8Encoding]::new($false))
-        $rewriteCount++
-        Write-Host "    patched array range: $($f.Name)"
-    }
-}
+# (old code removed)
 
 # ---------------------------------------------------------------------------
 # Rewrite 12: Static-class API redirects (the big one)
@@ -247,6 +225,22 @@ foreach ($f in $csFiles) {
     }
     if ($content -match 'Convert\.TryFromBase64String') {
         $content = $content -replace 'Convert\.TryFromBase64String', 'ConvertPolyfills.TryFromBase64String'
+        $changed = $true
+    }
+
+    # Architecture.RiscV64 / LoongArch64
+    if ($content -match 'Architecture\.RiscV64') {
+        $content = $content -replace 'Architecture\.RiscV64', 'ArchitecturePolyfills.IsRiscV64'
+        $changed = $true
+    }
+    if ($content -match 'Architecture\.LoongArch64') {
+        $content = $content -replace 'Architecture\.LoongArch64', 'ArchitecturePolyfills.IsLoongArch64'
+        $changed = $true
+    }
+
+    # Enum.IsDefined<T> (generic)
+    if ($content -match 'Enum\.IsDefined<') {
+        $content = $content -replace 'Enum\.IsDefined<', 'EnumPolyfills.IsDefined<'
         $changed = $true
     }
 

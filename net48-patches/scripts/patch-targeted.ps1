@@ -93,36 +93,98 @@ if (Test-Path $speedtest) {
 }
 
 # ---------------------------------------------------------------------------
-# Patch 3: DownloaderHelper.cs — SocketsHttpHandler -> HttpClientHandler
+# Patch 3: DownloaderHelper.cs — strip all unsupported HttpClientHandler
+# properties and Downloader 5.x-only config properties
 # ---------------------------------------------------------------------------
 $downloader = Join-Path $SourceDir "ServiceLib/Helper/DownloaderHelper.cs"
 if (Test-Path $downloader) {
     $content = Get-Content $downloader -Raw -Encoding UTF8
-    if ($content -match 'SocketsHttpHandler' -and $content -notmatch 'NET48 PORT: HttpClientHandler') {
-        # Replace type name
-        $new = $content -replace 'SocketsHttpHandler', 'HttpClientHandler'
+    if ($content -match 'NET48 PORT: DownloaderHelper stripped' -eq $false) {
+        # Replace SocketsHttpHandler -> HttpClientHandler
+        $content = $content -replace 'SocketsHttpHandler', 'HttpClientHandler'
 
-        # Remove properties that HttpClientHandler doesn't support
-        $new = $new -replace '\r?\n\s*MaxConnectionsPerServer\s*=\s*1000,', ''
-        $new = $new -replace '\r?\n\s*PooledConnectionIdleTimeout\s*=\s*config\.KeepAliveTimeout,', ''
-        $new = $new -replace '\r?\n\s*PooledConnectionLifetime\s*=\s*Timeout\.InfiniteTimeSpan,', ''
-        $new = $new -replace '\r?\n\s*EnableMultipleHttp2Connections\s*=\s*true,', ''
-        $new = $new -replace '\r?\n\s*ConnectTimeout\s*=\s*TimeSpan\.FromMilliseconds\(config\.ConnectTimeout\),', ''
-
-        # Stub keep-alive block
-        $new = $new -replace
-            '(?s)if\s*\(config\.KeepAlive\)\s*\{\s*handler\.KeepAlivePingTimeout\s*=\s*config\.KeepAliveTimeout;\s*handler\.KeepAlivePingPolicy\s*=\s*HttpKeepAlivePingPolicy\.WithActiveRequests;\s*\}',
-            '// NET48 PORT: keep-alive ping not available on HttpClientHandler'
-
-        # Stub CertificateChainPolicy block
-        $new = $new -replace
-            '(?s)if\s*\(certificateChainPolicy\s*!=\s*null\)\s*\{\s*handler\.SslOptions\.CertificateChainPolicy\s*=\s*certificateChainPolicy;\s*handler\.SslOptions\.RemoteCertificateValidationCallback\s*=\s*null;\s*\}',
-            '// NET48 PORT: CertificateChainPolicy not available on HttpClientHandler'
-
-        if ($new -ne $content) {
-            [System.IO.File]::WriteAllText($downloader, $new, [System.Text.UTF8Encoding]::new($false))
-            Write-Host "  > Patched DownloaderHelper.cs (SocketsHttpHandler -> HttpClientHandler)" -ForegroundColor Green
+        # Remove entire property blocks that HttpClientHandler doesn't support
+        # by wrapping them in #if false ... #endif
+        $propsToRemove = @(
+            'MaxConnectionsPerServer',
+            'PooledConnectionIdleTimeout',
+            'PooledConnectionLifetime',
+            'EnableMultipleHttp2Connections',
+            'ConnectTimeout',
+            'Expect100ContinueTimeout',
+            'KeepAlivePingTimeout',
+            'KeepAlivePingPolicy',
+            'SslOptions'
+        )
+        foreach ($prop in $propsToRemove) {
+            # Match: handler.PropertyName = value,  (single line)
+            $content = $content -replace "(?m)^\s*handler\.$prop\s*=\s*[^;]+;\s*$", "            /* net48: $prop not available on HttpClientHandler */"
+            # Match: handler.SslOptions.SubProp = value;
+            $content = $content -replace "(?m)^\s*handler\.SslOptions\.[^;]+;\s*$", "            /* net48: SslOptions not available */"
         }
+
+        # Remove Downloader 5.x-only config properties
+        # Match both `obj.Prop = value;` and `Prop = value,` (object initializer)
+        # For initializer form, DELETE THE ENTIRE LINE (including trailing comma)
+        $configPropsToRemove = @(
+            'BlockTimeout',
+            'MaxTryAgainOnFailure',
+            'CustomHttpMessageHandlerFactory'
+        )
+        foreach ($prop in $configPropsToRemove) {
+            # Statement form: obj.Prop = value;  -> comment out
+            $content = $content -replace "(?m)^\s*\w+\.$prop\s*=\s*[^;]+;\s*$", "            /* net48: $prop not in Downloader 3.0.6 */"
+            # Initializer form: Prop = value,  -> DELETE entire line
+            $content = $content -replace "(?m)^(\s*)$prop\s*=\s*[^,\r\n]+,\s*$", ""
+        }
+
+        # RequestConfiguration.ConnectTimeout (both forms)
+        # Initializer form: ConnectTimeout = value,  -> DELETE entire line
+        $content = $content -replace "(?m)^\s*ConnectTimeout\s*=\s*[^,;\r\n]+,\s*$", ""
+        # Statement form: obj.ConnectTimeout = value;  -> comment out
+        $content = $content -replace "(?m)^\s*\w+\.ConnectTimeout\s*=\s*[^;]+;\s*$", "            /* net48: ConnectTimeout */"
+        # KeepAliveTimeout same
+        $content = $content -replace "(?m)^\s*KeepAliveTimeout\s*=\s*[^,;\r\n]+,\s*$", ""
+        $content = $content -replace "(?m)^\s*\w+\.KeepAliveTimeout\s*=\s*[^;]+;\s*$", "            /* net48: KeepAliveTimeout */"
+
+        # Add marker comment
+        $content = "// NET48 PORT: DownloaderHelper stripped`n" + $content
+
+        [System.IO.File]::WriteAllText($downloader, $content, [System.Text.UTF8Encoding]::new($false))
+        Write-Host "  > Patched DownloaderHelper.cs (stripped unsupported properties)" -ForegroundColor Green
+    }
+}
+
+# ---------------------------------------------------------------------------
+# Patch 3b: DownloadService.cs — same treatment
+# ---------------------------------------------------------------------------
+$downloadSvc = Join-Path $SourceDir "ServiceLib/Services/DownloadService.cs"
+if (Test-Path $downloadSvc) {
+    $content = Get-Content $downloadSvc -Raw -Encoding UTF8
+    if ($content -match 'NET48 PORT: DownloadService stripped' -eq $false) {
+        $content = $content -replace 'SocketsHttpHandler', 'HttpClientHandler'
+
+        $propsToRemove = @(
+            'MaxConnectionsPerServer',
+            'PooledConnectionIdleTimeout',
+            'PooledConnectionLifetime',
+            'EnableMultipleHttp2Connections',
+            'ConnectTimeout',
+            'SslOptions'
+        )
+        foreach ($prop in $propsToRemove) {
+            # Statement form
+            $content = $content -replace "(?m)^\s*handler\.$prop\s*=\s*[^;]+;\s*$", "            /* net48: $prop not available */"
+            $content = $content -replace "(?m)^\s*handler\.SslOptions\.[^;]+;\s*$", "            /* net48: SslOptions not available */"
+            # Initializer form: Prop = value,  -> DELETE entire line
+            $content = $content -replace "(?m)^(\s*)$prop\s*=\s*[^,\r\n]+,\s*$", ""
+        }
+        # ConnectTimeout in initializer form -> DELETE entire line
+        $content = $content -replace "(?m)^\s*ConnectTimeout\s*=\s*[^,;\r\n]+,\s*$", ""
+
+        $content = "// NET48 PORT: DownloadService stripped`n" + $content
+        [System.IO.File]::WriteAllText($downloadSvc, $content, [System.Text.UTF8Encoding]::new($false))
+        Write-Host "  > Patched DownloadService.cs (stripped unsupported properties)" -ForegroundColor Green
     }
 }
 

@@ -108,6 +108,52 @@ namespace System.Collections.Generic
 
 namespace System
 {
+    /// <summary>.NET Standard 2.1 `HashCode` class polyfill. v2rayN uses
+    /// `HashCode.Combine(...)` in a few places.</summary>
+    internal static class HashCode
+    {
+        public static int Combine<T1>(T1 value1)
+        {
+            return value1?.GetHashCode() ?? 0;
+        }
+        public static int Combine<T1, T2>(T1 value1, T2 value2)
+        {
+            unchecked
+            {
+                int hash = 17;
+                hash = hash * 31 + (value1?.GetHashCode() ?? 0);
+                hash = hash * 31 + (value2?.GetHashCode() ?? 0);
+                return hash;
+            }
+        }
+        public static int Combine<T1, T2, T3>(T1 v1, T2 v2, T3 v3)
+        {
+            unchecked
+            {
+                int hash = 17;
+                hash = hash * 31 + (v1?.GetHashCode() ?? 0);
+                hash = hash * 31 + (v2?.GetHashCode() ?? 0);
+                hash = hash * 31 + (v3?.GetHashCode() ?? 0);
+                return hash;
+            }
+        }
+        public static int Combine<T1, T2, T3, T4>(T1 v1, T2 v2, T3 v3, T4 v4)
+        {
+            unchecked
+            {
+                int hash = 17;
+                hash = hash * 31 + (v1?.GetHashCode() ?? 0);
+                hash = hash * 31 + (v2?.GetHashCode() ?? 0);
+                hash = hash * 31 + (v3?.GetHashCode() ?? 0);
+                hash = hash * 31 + (v4?.GetHashCode() ?? 0);
+                return hash;
+            }
+        }
+    }
+}
+
+namespace System
+{
     internal static class EnumPolyfills
     {
         public static T Parse<T>(string value) where T : struct
@@ -121,6 +167,15 @@ namespace System
         public static bool TryParse<T>(string value, out T result) where T : struct
         {
             return Enum.TryParse<T>(value, out result);
+        }
+        public static T[] GetValues<T>() where T : struct
+        {
+            var arr = (T[])Enum.GetValues(typeof(T));
+            return arr;
+        }
+        public static bool IsDefined<T>(T value) where T : struct
+        {
+            return Enum.IsDefined(typeof(T), value);
         }
     }
 }

@@ -165,6 +165,10 @@ namespace System
         public static bool Contains(this string s, char c) => s.IndexOf(c) >= 0;
         public static bool Contains(this string s, char c, StringComparison _)
             => s.IndexOf(c) >= 0;
+        public static bool StartsWith(this string s, char c) => s.Length > 0 && s[0] == c;
+        public static bool EndsWith(this string s, char c) => s.Length > 0 && s[s.Length - 1] == c;
+        public static string Replace(this string s, char oldChar, char newChar)
+            => s.Replace(oldChar.ToString(), newChar.ToString());
         public static string[] Split(this string s, char separator, StringSplitOptions options = StringSplitOptions.None)
             => s.Split(new[] { separator }, options);
         public static string[] Split(this string s, char separator, int count, StringSplitOptions options = StringSplitOptions.None)

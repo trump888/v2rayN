@@ -238,5 +238,160 @@ namespace System.Net.Http
         {
             return client.SendAsync(new HttpRequestMessage(new HttpMethod("PATCH"), requestUri) { Content = content }, cancellationToken);
         }
+
+        public static Task<string> GetStringAsync(this HttpClient client, string requestUri, CancellationToken cancellationToken)
+        {
+            return client.GetStringAsync(requestUri);
+        }
+        public static Task<string> GetStringAsync(this HttpClient client, Uri requestUri, CancellationToken cancellationToken)
+        {
+            return client.GetStringAsync(requestUri);
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Process.Kill(bool) — net48 Process.Kill() takes no args; .NET 5+ added
+// Kill(bool entireProcessTree). We provide as extension method.
+// ---------------------------------------------------------------------------
+
+namespace System.Diagnostics
+{
+    internal static class ProcessPolyfills
+    {
+        public static void Kill(this Process process, bool entireProcessTree)
+        {
+            // net48: just kill the process itself, ignore tree
+            process.Kill();
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Stream.ReadAsync(Memory<byte>, CancellationToken) — .NET Core 2.1+
+// Stream.WriteAsync(ReadOnlyMemory<byte>, CancellationToken) — .NET Core 2.1+
+// StreamReader.ReadToEndAsync(CancellationToken) — .NET 7+
+// ---------------------------------------------------------------------------
+
+namespace System.IO
+{
+    internal static class StreamPolyfills
+    {
+        public static async Task<int> ReadAsync(this Stream stream, System.Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            var arr = buffer.ToArray();
+            int read = await stream.ReadAsync(arr, 0, arr.Length, cancellationToken);
+            arr.CopyTo(buffer.Span);
+            return read;
+        }
+        public static async Task WriteAsync(this Stream stream, System.ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            await stream.WriteAsync(buffer.ToArray(), 0, buffer.Length, cancellationToken);
+        }
+        public static async Task<int> ReadAsync(this StreamReader reader, System.Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            // StreamReader doesn't have ReadAsync(Memory<byte>); read char-by-char
+            var arr = buffer.ToArray();
+            int read = 0;
+            char[] charBuf = new char[1];
+            while (read < arr.Length)
+            {
+                int n = await reader.ReadAsync(charBuf, 0, 1);
+                if (n == 0) break;
+                arr[read++] = (byte)charBuf[0];
+            }
+            arr.CopyTo(buffer.Span);
+            return read;
+        }
+        public static Task<string> ReadToEndAsync(this StreamReader reader, CancellationToken cancellationToken)
+        {
+            // net48 StreamReader.ReadToEndAsync() doesn't accept CancellationToken;
+            // just ignore it
+            return reader.ReadToEndAsync();
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TcpClient.ConnectAsync(string host, int port, CancellationToken) — .NET 5+
+// ---------------------------------------------------------------------------
+
+namespace System.Net.Sockets
+{
+    internal static class TcpClientPolyfills
+    {
+        public static async Task ConnectAsync(this TcpClient client, string host, int port, CancellationToken cancellationToken)
+        {
+            // net48: ConnectAsync doesn't accept CancellationToken
+            await client.ConnectAsync(host, port);
+        }
+        public static async Task ConnectAsync(this TcpClient client, IPAddress address, int port, CancellationToken cancellationToken)
+        {
+            await client.ConnectAsync(address, port);
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Architecture.RiscV64 / LoongArch64 — .NET 7+ enum values
+// ---------------------------------------------------------------------------
+
+namespace System.Runtime.InteropServices
+{
+    internal static class ArchitecturePolyfills
+    {
+        // Architecture enum already exists in net48 but lacks RiscV64/LoongArch64
+        // We provide a static helper that returns false for these (they don't
+        // exist on net48 anyway)
+        public static bool IsRiscV64 => false;
+        public static bool IsLoongArch64 => false;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Socket.ConnectAsync(SocketType, ProtocolType, string, int, CancellationToken)
+// — .NET 5+ overload. net48 only has ConnectAsync(string, int).
+// ---------------------------------------------------------------------------
+
+namespace System.Net.Sockets
+{
+    internal static class SocketPolyfills
+    {
+        public static async Task ConnectAsync(this Socket socket, SocketType socketType, ProtocolType protocolType, string host, int port)
+        {
+            await Task.Run(() => socket.Connect(host, port));
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// string.Replace(string, string, StringComparison) — .NET Core 2.0+
+// net48 only has Replace(string, string) (culture-sensitive)
+// ---------------------------------------------------------------------------
+
+namespace System
+{
+    internal static class StringReplacePolyfills
+    {
+        public static string Replace(this string s, string oldValue, string newValue, StringComparison comparisonType)
+        {
+            // Simple implementation: use IndexOf with comparison, then build result
+            if (string.IsNullOrEmpty(oldValue)) return s;
+            var result = new System.Text.StringBuilder();
+            int idx = 0;
+            while (idx < s.Length)
+            {
+                int found = s.IndexOf(oldValue, idx, comparisonType);
+                if (found < 0)
+                {
+                    result.Append(s, idx, s.Length - idx);
+                    break;
+                }
+                result.Append(s, idx, found - idx);
+                result.Append(newValue);
+                idx = found + oldValue.Length;
+            }
+            return result.ToString();
+        }
     }
 }
