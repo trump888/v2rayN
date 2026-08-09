@@ -617,8 +617,14 @@ foreach ($f in $csFilesWpf) {
         $changed = $true
     }
     # public static partial int Method(...) -> public static extern int Method(...)
-    if ($content -match 'static\s+partial\s+') {
-        $content = $content -replace 'static\s+partial\s+', 'static extern '
+    # ONLY for methods (not classes) — match "static partial" NOT followed by "class"
+    if ($content -match 'static\s+partial\s+(?!class)') {
+        $content = $content -replace 'static\s+partial\s+(?!class)', 'static extern '
+        $changed = $true
+    }
+    # Also remove "partial" from class declarations: "static partial class" -> "static class"
+    if ($content -match 'static\s+partial\s+class') {
+        $content = $content -replace 'static\s+partial\s+class', 'static class'
         $changed = $true
     }
     # nint -> IntPtr, nuint -> UIntPtr in WPF project too
@@ -639,19 +645,21 @@ foreach ($f in $csFilesWpf) {
 }
 
 # 19c: SimpleViewLocator.cs — IViewLocator interface mismatch
-# ReactiveUI 19.x IViewLocator requires ResolveView<T>(T viewModel, string? contract)
-# but source has ResolveView<T>(string? contract) — missing viewModel parameter
+# ReactiveUI 19.x IViewLocator requires:
+#   IViewFor ResolveView<T>(T? viewModel, string? contract)
+# Source has:
+#   IViewFor<TViewModel>? ResolveView<TViewModel>(string? contract)
+# Need to: 1) add viewModel param, 2) change return type to IViewFor? (non-generic)
 $simpleView = Join-Path $SourceDir "v2rayN/Common/SimpleViewLocator.cs"
 if (Test-Path $simpleView) {
     $content = Get-Content $simpleView -Raw -Encoding UTF8
     if ($content -notmatch 'net48.*IViewLocator') {
-        # Change ResolveView<TViewModel>(string? contract = null)
-        # to ResolveView<TViewModel>(TViewModel? viewModel, string? contract = null)
+        # Change signature: add viewModel param AND change return type to IViewFor?
         $content = $content -replace
             'public IViewFor<TViewModel>\? ResolveView<TViewModel>\(string\? contract = null\)',
-            'public IViewFor<TViewModel>? ResolveView<TViewModel>(TViewModel? viewModel, string? contract = null)'
+            'public IViewFor? ResolveView<TViewModel>(TViewModel? viewModel, string? contract = null)'
         [System.IO.File]::WriteAllText($simpleView, $content, [System.Text.UTF8Encoding]::new($false))
-        Write-Host "    patched SimpleViewLocator.cs (IViewLocator signature)"
+        Write-Host "    patched SimpleViewLocator.cs (IViewLocator signature + return type)"
     }
 }
 
