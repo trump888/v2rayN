@@ -88,6 +88,9 @@ foreach ($f in $filesToCopy) {
 # ---------------------------------------------------------------------------
 Write-Section "Step 3: Install polyfill shim files"
 
+# Shims go to BOTH ServiceLib/Common AND AmazTool/Root because AmazTool has
+# its own .cs files that use Index/Range/MemoryClamp etc. and it doesn't
+# reference ServiceLib.
 $shims = @(
     @{ Src = "shims/IsExternalInit.cs";         Dst = "ServiceLib/Common/IsExternalInit.cs" }
     @{ Src = "shims/SupportedOSPlatform.cs";    Dst = "ServiceLib/Common/SupportedOSPlatform.cs" }
@@ -95,6 +98,10 @@ $shims = @(
     @{ Src = "shims/BclPolyfills2.cs";          Dst = "ServiceLib/Common/BclPolyfills2.cs" }
     @{ Src = "shims/RxSchedulers.cs";           Dst = "ServiceLib/Common/RxSchedulers.cs" }
     @{ Src = "shims/BinaryPrimitives.cs";       Dst = "ServiceLib.UdpTest/BinaryPrimitives.cs" }
+    # BclPolyfills.cs also needed in AmazTool (uses Index/Range)
+    @{ Src = "shims/BclPolyfills.cs";           Dst = "AmazTool/BclPolyfills.cs" }
+    @{ Src = "shims/SupportedOSPlatform.cs";    Dst = "AmazTool/SupportedOSPlatform.cs" }
+    @{ Src = "shims/IsExternalInit.cs";         Dst = "AmazTool/IsExternalInit.cs" }
 )
 
 foreach ($s in $shims) {

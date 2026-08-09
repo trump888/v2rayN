@@ -125,6 +125,35 @@ namespace System
     }
 }
 
+namespace System.Runtime.CompilerServices
+{
+    /// <summary>
+    /// .NET Core 3.0+ provides `RuntimeHelpers.GetSubArray&lt;T&gt;(T[], Range)`
+    /// which the C# compiler emits when you write `array[1..n]`.
+    /// .NET Framework 4.8 does NOT ship this method, so we polyfill it.
+    /// </summary>
+    internal static class RuntimeHelpersPolyfills
+    {
+        public static T[] GetSubArray<T>(T[] array, Range range)
+        {
+            if (array == null) throw new ArgumentNullException(nameof(array));
+            var (offset, length) = range.GetOffsetAndLength(array.Length);
+            if (default(T) == null && length != 0)
+            {
+                var result = new T[length];
+                Array.Copy(array, offset, result, 0, length);
+                return result;
+            }
+            else
+            {
+                var result = new T[length];
+                Array.Copy(array, offset, result, 0, length);
+                return result;
+            }
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
 // String / Char polyfills
 // ---------------------------------------------------------------------------

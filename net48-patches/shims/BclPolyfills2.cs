@@ -16,6 +16,8 @@
 
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -135,6 +137,32 @@ namespace System
     {
         // No members - this class exists only for documentation.
         // Real fix: replace `nint.Zero` -> `IntPtr.Zero` in source.
+    }
+}
+
+namespace System
+{
+    internal static class EnvironmentPolyfills
+    {
+        /// <summary>.NET Core 3.0+ `Environment.ProcessPath` polyfill.
+        /// On net48 we use GetCurrentProcess().MainModule.FileName.
+        /// Source code is rewritten to call `EnvironmentPolyfills.ProcessPath`
+        /// instead of `Environment.ProcessPath` (extension methods can't add
+        /// properties to static classes).</summary>
+        public static string ProcessPath
+        {
+            get
+            {
+                try
+                {
+                    return System.Diagnostics.Process.GetCurrentProcess().MainModule.FileName;
+                }
+                catch
+                {
+                    return null;
+                }
+            }
+        }
     }
 }
 

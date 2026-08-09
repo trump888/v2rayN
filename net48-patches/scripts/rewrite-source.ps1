@@ -281,12 +281,71 @@ foreach ($f in $csFiles) {
 }
 
 # ---------------------------------------------------------------------------
-# Rewrite 12: collection expressions `["a", "b"]`
+# Rewrite 12: array range slice `arr[1..n]` -> `arr.Skip(1).Take(n-1).ToArray()`
+# or `arr[1..]` -> `arr.Skip(1).ToArray()`
+# Because net48 RuntimeHelpers lacks GetSubArray<T> which the compiler emits
+# for array Range slicing. We rewrite the most common patterns.
+# ---------------------------------------------------------------------------
+foreach ($f in $csFiles) {
+    $content = Get-Content $f.FullName -Raw -Encoding UTF8
+    $changed = $false
+
+    # arr[1..arr.Length] -> arr.Skip(1).ToArray()
+    $pattern = '(\w+)\[(\d+)\.\.(\w+)\.Length\]'
+    while ($content -match $pattern) {
+        $arr = $matches[1]
+        $start = $matches[2]
+        $endVar = $matches[3]
+        $content = $content -replace [regex]::Escape($matches[0]), "$arr.Skip($start).ToArray()"
+        $changed = $true
+    }
+
+    # arr[1..] -> arr.Skip(1).ToArray()
+    $pattern2 = '(\w+)\[(\d+)\.\.\]'
+    while ($content -match $pattern2) {
+        $arr = $matches[1]
+        $start = $matches[2]
+        $content = $content -replace [regex]::Escape($matches[0]), "$arr.Skip($start).ToArray()"
+        $changed = $true
+    }
+
+    # arr[..n] -> arr.Take(n).ToArray()
+    $pattern3 = '(\w+)\[\.\.(\d+)\]'
+    while ($content -match $pattern3) {
+        $arr = $matches[1]
+        $n = $matches[2]
+        $content = $content -replace [regex]::Escape($matches[0]), "$arr.Take($n).ToArray()"
+        $changed = $true
+    }
+
+    if ($changed) {
+        [System.IO.File]::WriteAllText($f.FullName, $content, [System.Text.UTF8Encoding]::new($false))
+        $rewriteCount++
+        Write-Host "    patched array range slice: $($f.Name)"
+    }
+}
+
+# ---------------------------------------------------------------------------
+# Rewrite 13: collection expressions `["a", "b"]`
 # C# 12 supports them natively; the compiler will infer List<string>.
 # However, when the target type is NOT List<string> (e.g. string[] or List<T>),
 # inference fails. Our polyfill handles List<string>; for others, leave them
 # to compiler and surface as errors.
 # Skip — C# 12 native is best.
+
+# ---------------------------------------------------------------------------
+# Rewrite 14: `Environment.ProcessPath` -> `EnvironmentPolyfills.ProcessPath`
+# (net48 Environment class lacks ProcessPath property; .NET Core 3+ only)
+# ---------------------------------------------------------------------------
+foreach ($f in $csFiles) {
+    $content = Get-Content $f.FullName -Raw -Encoding UTF8
+    if ($content -match 'Environment\.ProcessPath') {
+        $content = $content -replace 'Environment\.ProcessPath', 'EnvironmentPolyfills.ProcessPath'
+        [System.IO.File]::WriteAllText($f.FullName, $content, [System.Text.UTF8Encoding]::new($false))
+        $rewriteCount++
+        Write-Host "    patched Environment.ProcessPath: $($f.Name)"
+    }
+}
 
 Write-Host "  Total rewrites: $rewriteCount files touched"
 exit 0
