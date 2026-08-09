@@ -638,13 +638,16 @@ $simpleView = Join-Path $SourceDir "v2rayN/Common/SimpleViewLocator.cs"
 if (Test-Path $simpleView) {
     $content = Get-Content $simpleView -Raw -Encoding UTF8
     if ($content -notmatch 'net48.*IViewLocator') {
-        # Change signature: add viewModel param, change return type to IViewFor?,
-        # KEEP the "where TViewModel : class" constraint (IViewFor<T> requires it)
+        # 1) Change signature: add viewModel param, change return type to IViewFor?,
+        #    REMOVE "where TViewModel : class" (interface doesn't have it)
         $content = $content -replace
             'public IViewFor<TViewModel>\? ResolveView<TViewModel>\(string\? contract = null\) where TViewModel : class',
-            'public IViewFor? ResolveView<TViewModel>(TViewModel? viewModel, string? contract = null) where TViewModel : class'
+            'public IViewFor? ResolveView<TViewModel>(TViewModel? viewModel, string? contract = null)'
+        # 2) Change body: "factory() as IViewFor<TViewModel>" -> "factory() as IViewFor"
+        #    (because without "where T : class", IViewFor<TViewModel> won't compile)
+        $content = $content -replace 'factory\(\) as IViewFor<TViewModel>', 'factory() as IViewFor'
         [System.IO.File]::WriteAllText($simpleView, $content, [System.Text.UTF8Encoding]::new($false))
-        Write-Host "    patched SimpleViewLocator.cs (IViewLocator signature)"
+        Write-Host "    patched SimpleViewLocator.cs (IViewLocator signature + constraint removed)"
     }
 }
 
