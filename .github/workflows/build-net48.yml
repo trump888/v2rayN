@@ -71,10 +71,10 @@ jobs:
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v2
 
-      - name: Setup .NET SDK 8 (for NuGet restore & some build tools)
+      - name: Setup .NET SDK 9 (for C# 13 / partial properties support)
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'
+          dotnet-version: '9.0.x'
 
       - name: Add .NET Framework 4.8 Developer Pack check
         shell: pwsh
