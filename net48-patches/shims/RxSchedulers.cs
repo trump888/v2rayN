@@ -64,7 +64,7 @@ namespace ServiceLib.Common
                 }
 
                 // Last resort: run synchronously
-                _mainThreadScheduler = ImmediateScheduler.Instance;
+                _mainThreadScheduler = System.Reactive.Concurrency.ImmediateScheduler.Instance;
                 return _mainThreadScheduler;
             }
             set { _mainThreadScheduler = value; }
@@ -78,7 +78,7 @@ namespace ServiceLib.Common
             get
             {
                 if (_taskpoolScheduler != null) return _taskpoolScheduler;
-                _taskpoolScheduler = TaskPoolScheduler.Default;
+                _taskpoolScheduler = System.Reactive.Concurrency.TaskPoolScheduler.Default;
                 return _taskpoolScheduler;
             }
             set { _taskpoolScheduler = value; }
@@ -87,6 +87,6 @@ namespace ServiceLib.Common
         /// <summary>
         /// Scheduler that runs work immediately on the calling thread.
         /// </summary>
-        public static IScheduler ImmediateScheduler => ImmediateScheduler.Instance;
+        public static IScheduler ImmediateScheduler => System.Reactive.Concurrency.ImmediateScheduler.Instance;
     }
 }

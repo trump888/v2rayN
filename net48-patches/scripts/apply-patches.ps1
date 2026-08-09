@@ -96,10 +96,13 @@ $shims = @(
     @{ Src = "shims/SupportedOSPlatform.cs";    Dst = "ServiceLib/Common/SupportedOSPlatform.cs" }
     @{ Src = "shims/BclPolyfills.cs";           Dst = "ServiceLib/Common/BclPolyfills.cs" }
     @{ Src = "shims/BclPolyfills2.cs";          Dst = "ServiceLib/Common/BclPolyfills2.cs" }
+    @{ Src = "shims/BclPolyfills3.cs";          Dst = "ServiceLib/Common/BclPolyfills3.cs" }
     @{ Src = "shims/RxSchedulers.cs";           Dst = "ServiceLib/Common/RxSchedulers.cs" }
     @{ Src = "shims/BinaryPrimitives.cs";       Dst = "ServiceLib.UdpTest/BinaryPrimitives.cs" }
-    # BclPolyfills.cs also needed in AmazTool (uses Index/Range)
+    # AmazTool also needs polyfills (independent project, doesn't reference ServiceLib)
     @{ Src = "shims/BclPolyfills.cs";           Dst = "AmazTool/BclPolyfills.cs" }
+    @{ Src = "shims/BclPolyfills2.cs";          Dst = "AmazTool/BclPolyfills2.cs" }
+    @{ Src = "shims/BclPolyfills3.cs";          Dst = "AmazTool/BclPolyfills3.cs" }
     @{ Src = "shims/SupportedOSPlatform.cs";    Dst = "AmazTool/SupportedOSPlatform.cs" }
     @{ Src = "shims/IsExternalInit.cs";         Dst = "AmazTool/IsExternalInit.cs" }
 )
