@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+        <PropertyGroup>
+                <OutputType>Exe</OutputType>
+                <!-- TargetFramework comes from Directory.Build.props (net48) -->
+                <ApplicationIcon>..\v2rayN\Resources\v2rayN.ico</ApplicationIcon>
+        </PropertyGroup>
+
+        <ItemGroup>
+                <!-- net48 polyfill: ZipArchiveEntry lives in System.IO.Compression.dll
+                     which is not auto-referenced by net48 SDK-style projects. -->
+                <Reference Include="System.IO.Compression" />
+                <Reference Include="System.IO.Compression.FileSystem" />
+        </ItemGroup>
+
+        <ItemGroup>
+                <EmbeddedResource Update="Resx\Resource.resx">
+                        <Generator>ResXFileCodeGenerator</Generator>
+                        <LastGenOutput>Resource.Designer.cs</LastGenOutput>
+                </EmbeddedResource>
+
+                <Compile Update="Resx\Resource.Designer.cs">
+                        <DesignTime>True</DesignTime>
+                        <AutoGen>True</AutoGen>
+                        <DependentUpon>Resource.resx</DependentUpon>
+                </Compile>
+        </ItemGroup>
+
+</Project>

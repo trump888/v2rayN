@@ -73,6 +73,7 @@ $filesToCopy = @(
     @{ Src = "patches/v2rayN.sln";               Dst = "v2rayN.sln" }
     @{ Src = "patches/v2rayN.csproj";            Dst = "v2rayN/v2rayN.csproj" }
     @{ Src = "patches/ServiceLib.csproj";        Dst = "ServiceLib/ServiceLib.csproj" }
+    @{ Src = "patches/AmazTool.csproj";          Dst = "AmazTool/AmazTool.csproj" }
 )
 
 foreach ($f in $filesToCopy) {
