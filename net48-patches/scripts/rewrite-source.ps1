@@ -556,7 +556,6 @@ foreach ($f in $csFiles) {
 
 # ---------------------------------------------------------------------------
 # Rewrite 18: MaterialDesign 5.x-only XAML attributes — delete them
-# MaterialDesignThemes 3.2.0 (net48) lacks NavigationRailAssist.ShowSelectionBackground
 # ---------------------------------------------------------------------------
 $xamlFiles = Get-ChildItem -Path $SourceDir -Recurse -Filter "*.xaml" |
     Where-Object { $_.FullName -notmatch "\\(obj|bin)\\" }
@@ -575,6 +574,84 @@ foreach ($f in $xamlFiles) {
         [System.IO.File]::WriteAllText($f.FullName, $content, [System.Text.UTF8Encoding]::new($false))
         $rewriteCount++
         Write-Host "    patched XAML NavigationRailAssist: $($f.Name)"
+    }
+}
+
+# ---------------------------------------------------------------------------
+# Rewrite 19: v2rayN WPF project fixes
+#   - Comment out missing namespaces in GlobalUsings.cs
+#   - LibraryImport -> DllImport, partial methods -> regular methods
+#   - IViewLocator.ResolveView<T> signature fix
+# ---------------------------------------------------------------------------
+
+# 19a: GlobalUsings.cs — comment out missing namespaces
+$globalUsingsWpf = Join-Path $SourceDir "v2rayN/GlobalUsings.cs"
+if (Test-Path $globalUsingsWpf) {
+    $content = Get-Content $globalUsingsWpf -Raw -Encoding UTF8
+    $changed = $false
+    if ($content -match 'System\.Reactive\.Disposables\.Fluent') {
+        $content = $content -replace 'global using System\.Reactive\.Disposables\.Fluent;', '// global using System.Reactive.Disposables.Fluent; // net48: not available'
+        $changed = $true
+    }
+    if ($content -match 'ReactiveUI\.Builder') {
+        $content = $content -replace 'global using ReactiveUI\.Builder;', '// global using ReactiveUI.Builder; // net48: not available'
+        $changed = $true
+    }
+    if ($changed) {
+        [System.IO.File]::WriteAllText($globalUsingsWpf, $content, [System.Text.UTF8Encoding]::new($false))
+        Write-Host "    patched v2rayN/GlobalUsings.cs (commented missing namespaces)"
+    }
+}
+
+# 19b: HotkeyManager.cs and WindowsUtils.cs — LibraryImport -> DllImport
+$csFilesWpf = Get-ChildItem -Path (Join-Path $SourceDir "v2rayN") -Recurse -Filter "*.cs" |
+    Where-Object { $_.FullName -notmatch "\\(obj|bin)\\" }
+
+foreach ($f in $csFilesWpf) {
+    $content = Get-Content $f.FullName -Raw -Encoding UTF8
+    $changed = $false
+
+    # [LibraryImport("xxx")] -> [DllImport("xxx")]
+    if ($content -match '\[LibraryImport\(') {
+        $content = $content -replace '\[LibraryImport\(', '[DllImport('
+        $changed = $true
+    }
+    # public static partial int Method(...) -> public static extern int Method(...)
+    if ($content -match 'static\s+partial\s+') {
+        $content = $content -replace 'static\s+partial\s+', 'static extern '
+        $changed = $true
+    }
+    # nint -> IntPtr, nuint -> UIntPtr in WPF project too
+    if ($content -match 'nint\b') {
+        $content = $content -replace '\bnint\b', 'IntPtr'
+        $changed = $true
+    }
+    if ($content -match 'nuint\b') {
+        $content = $content -replace '\bnuint\b', 'UIntPtr'
+        $changed = $true
+    }
+
+    if ($changed) {
+        [System.IO.File]::WriteAllText($f.FullName, $content, [System.Text.UTF8Encoding]::new($false))
+        $rewriteCount++
+        Write-Host "    patched WPF source: $($f.Name)"
+    }
+}
+
+# 19c: SimpleViewLocator.cs — IViewLocator interface mismatch
+# ReactiveUI 19.x IViewLocator requires ResolveView<T>(T viewModel, string? contract)
+# but source has ResolveView<T>(string? contract) — missing viewModel parameter
+$simpleView = Join-Path $SourceDir "v2rayN/Common/SimpleViewLocator.cs"
+if (Test-Path $simpleView) {
+    $content = Get-Content $simpleView -Raw -Encoding UTF8
+    if ($content -notmatch 'net48.*IViewLocator') {
+        # Change ResolveView<TViewModel>(string? contract = null)
+        # to ResolveView<TViewModel>(TViewModel? viewModel, string? contract = null)
+        $content = $content -replace
+            'public IViewFor<TViewModel>\? ResolveView<TViewModel>\(string\? contract = null\)',
+            'public IViewFor<TViewModel>? ResolveView<TViewModel>(TViewModel? viewModel, string? contract = null)'
+        [System.IO.File]::WriteAllText($simpleView, $content, [System.Text.UTF8Encoding]::new($false))
+        Write-Host "    patched SimpleViewLocator.cs (IViewLocator signature)"
     }
 }
 
