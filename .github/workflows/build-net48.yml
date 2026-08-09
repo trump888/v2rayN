@@ -53,20 +53,44 @@ jobs:
       - name: Configure git (longpaths)
         run: git config --global core.longpaths true
 
-      - name: Checkout (fork HEAD)
-        if: inputs.use_release_source != true
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          submodules: recursive
+      # =====================================================================
+      # Two-step checkout:
+      #   1. Checkout fork HEAD to get net48-patches/ and .github/workflows/
+      #   2. Checkout upstream release tag (e.g. 7.24.4) on top of v2rayN/
+      #      folder to get a known-stable source.
+      #
+      # Why: master branch may use newer APIs (ReactiveUI 24.x, ReactiveUI.
+      # Primitives, ReactiveUI.SourceGenerators) that our patches haven't
+      # been updated for. The release tag is a known-good baseline.
+      # =====================================================================
 
-      - name: Checkout (upstream release tag)
-        if: inputs.use_release_source == true
+      - name: Checkout fork HEAD (for net48-patches/)
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           submodules: recursive
+          path: fork-head
+
+      - name: Checkout upstream release tag (for v2rayN source)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+          repository: 2dust/v2rayN
           ref: ${{ inputs.release_version || '7.24.4' }}
+          path: v2rayN-src
+
+      - name: Move patches into place
+        shell: pwsh
+        run: |
+          # Replace v2rayN-src/v2rayN/ with the upstream source, then move
+          # fork-head's net48-patches/ next to it.
+          mv v2rayN-src/v2rayN ./v2rayN
+          mv fork-head/net48-patches ./net48-patches
+          # Show structure
+          ls
+          ls v2rayN | Select-Object -First 5
+          ls net48-patches
 
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v2
