@@ -584,8 +584,22 @@ foreach ($f in $xamlFiles) {
 #   - IViewLocator.ResolveView<T> signature fix
 # ---------------------------------------------------------------------------
 
-# 19a: GlobalUsings.cs — these namespaces are now provided by WpfPolyfills.cs
-# No need to comment them out anymore
+# 19a: GlobalUsings.cs — comment out System.Reactive.Disposables.Fluent
+# (net48's DisposableMixins already has DisposeWith; our shim caused CS0121 ambiguity)
+# ReactiveUI.Builder is now provided by WpfPolyfills.cs, so keep that using.
+$globalUsingsWpf = Join-Path $SourceDir "v2rayN/GlobalUsings.cs"
+if (Test-Path $globalUsingsWpf) {
+    $content = Get-Content $globalUsingsWpf -Raw -Encoding UTF8
+    $changed = $false
+    if ($content -match 'global using System\.Reactive\.Disposables\.Fluent;') {
+        $content = $content -replace 'global using System\.Reactive\.Disposables\.Fluent;', '// global using System.Reactive.Disposables.Fluent; // net48: DisposableMixins already has DisposeWith'
+        $changed = $true
+    }
+    if ($changed) {
+        [System.IO.File]::WriteAllText($globalUsingsWpf, $content, [System.Text.UTF8Encoding]::new($false))
+        Write-Host "    patched v2rayN/GlobalUsings.cs (commented Fluent namespace)"
+    }
+}
 
 # 19b: HotkeyManager.cs and WindowsUtils.cs — LibraryImport -> DllImport
 $csFilesWpf = Get-ChildItem -Path (Join-Path $SourceDir "v2rayN") -Recurse -Filter "*.cs" |
