@@ -99,6 +99,8 @@ $shims = @(
     @{ Src = "shims/BclPolyfills3.cs";          Dst = "ServiceLib/Common/BclPolyfills3.cs" }
     @{ Src = "shims/RxSchedulers.cs";           Dst = "ServiceLib/Common/RxSchedulers.cs" }
     @{ Src = "shims/BinaryPrimitives.cs";       Dst = "ServiceLib.UdpTest/BinaryPrimitives.cs" }
+    # WPF-specific polyfills (only for v2rayN project, not AmazTool)
+    @{ Src = "shims/WpfPolyfills.cs";           Dst = "v2rayN/WpfPolyfills.cs" }
     # AmazTool only needs basic polyfills (no CliWrap, no ReactiveUI, no X509)
     @{ Src = "shims/BclPolyfills.cs";           Dst = "AmazTool/BclPolyfills.cs" }
     @{ Src = "shims/BclPolyfills2.cs";          Dst = "AmazTool/BclPolyfills2.cs" }

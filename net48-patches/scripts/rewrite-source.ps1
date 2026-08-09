@@ -584,24 +584,8 @@ foreach ($f in $xamlFiles) {
 #   - IViewLocator.ResolveView<T> signature fix
 # ---------------------------------------------------------------------------
 
-# 19a: GlobalUsings.cs — comment out missing namespaces
-$globalUsingsWpf = Join-Path $SourceDir "v2rayN/GlobalUsings.cs"
-if (Test-Path $globalUsingsWpf) {
-    $content = Get-Content $globalUsingsWpf -Raw -Encoding UTF8
-    $changed = $false
-    if ($content -match 'System\.Reactive\.Disposables\.Fluent') {
-        $content = $content -replace 'global using System\.Reactive\.Disposables\.Fluent;', '// global using System.Reactive.Disposables.Fluent; // net48: not available'
-        $changed = $true
-    }
-    if ($content -match 'ReactiveUI\.Builder') {
-        $content = $content -replace 'global using ReactiveUI\.Builder;', '// global using ReactiveUI.Builder; // net48: not available'
-        $changed = $true
-    }
-    if ($changed) {
-        [System.IO.File]::WriteAllText($globalUsingsWpf, $content, [System.Text.UTF8Encoding]::new($false))
-        Write-Host "    patched v2rayN/GlobalUsings.cs (commented missing namespaces)"
-    }
-}
+# 19a: GlobalUsings.cs — these namespaces are now provided by WpfPolyfills.cs
+# No need to comment them out anymore
 
 # 19b: HotkeyManager.cs and WindowsUtils.cs — LibraryImport -> DllImport
 $csFilesWpf = Get-ChildItem -Path (Join-Path $SourceDir "v2rayN") -Recurse -Filter "*.cs" |
@@ -655,12 +639,12 @@ if (Test-Path $simpleView) {
     $content = Get-Content $simpleView -Raw -Encoding UTF8
     if ($content -notmatch 'net48.*IViewLocator') {
         # Change signature: add viewModel param, change return type to IViewFor?,
-        # AND remove the "where TViewModel : class" constraint (interface doesn't have it)
+        # KEEP the "where TViewModel : class" constraint (IViewFor<T> requires it)
         $content = $content -replace
             'public IViewFor<TViewModel>\? ResolveView<TViewModel>\(string\? contract = null\) where TViewModel : class',
-            'public IViewFor? ResolveView<TViewModel>(TViewModel? viewModel, string? contract = null)'
+            'public IViewFor? ResolveView<TViewModel>(TViewModel? viewModel, string? contract = null) where TViewModel : class'
         [System.IO.File]::WriteAllText($simpleView, $content, [System.Text.UTF8Encoding]::new($false))
-        Write-Host "    patched SimpleViewLocator.cs (IViewLocator signature + return type + constraint)"
+        Write-Host "    patched SimpleViewLocator.cs (IViewLocator signature)"
     }
 }
 
