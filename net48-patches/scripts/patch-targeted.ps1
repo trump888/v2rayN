@@ -139,13 +139,18 @@ if (Test-Path $downloader) {
         }
 
         # RequestConfiguration.ConnectTimeout (both forms)
-        # Initializer form: ConnectTimeout = value,  -> DELETE entire line
-        $content = $content -replace "(?m)^\s*ConnectTimeout\s*=\s*[^,;\r\n]+,\s*$", ""
+        # Initializer form: ConnectTimeout = value  (with or without trailing comma)
+        $content = $content -replace "(?m)^\s*ConnectTimeout\s*=\s*[^,;\r\n]+,?\s*$", ""
         # Statement form: obj.ConnectTimeout = value;  -> comment out
         $content = $content -replace "(?m)^\s*\w+\.ConnectTimeout\s*=\s*[^;]+;\s*$", "            /* net48: ConnectTimeout */"
         # KeepAliveTimeout same
-        $content = $content -replace "(?m)^\s*KeepAliveTimeout\s*=\s*[^,;\r\n]+,\s*$", ""
+        $content = $content -replace "(?m)^\s*KeepAliveTimeout\s*=\s*[^,;\r\n]+,?\s*$", ""
         $content = $content -replace "(?m)^\s*\w+\.KeepAliveTimeout\s*=\s*[^;]+;\s*$", "            /* net48: KeepAliveTimeout */"
+        # Also handle handler.PooledConnectionIdleTimeout etc. in statement form
+        $extraProps = @('PooledConnectionIdleTimeout', 'PooledConnectionLifetime', 'EnableMultipleHttp2Connections')
+        foreach ($prop in $extraProps) {
+            $content = $content -replace "(?m)^\s*handler\.$prop\s*=\s*[^;]+;\s*$", "            /* net48: $prop */"
+        }
 
         # Add marker comment
         $content = "// NET48 PORT: DownloaderHelper stripped`n" + $content

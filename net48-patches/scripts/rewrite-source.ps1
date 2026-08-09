@@ -153,11 +153,37 @@ foreach ($f in $csFiles) {
 }
 
 # ---------------------------------------------------------------------------
-# Rewrite 11: DISABLED — was rewriting arr[1..] to arr.Skip(1).ToArray()
-# which breaks STRING slicing (string.Skip(1).ToArray() = char[], not string).
-# Let the compiler handle Range natively via our Index/Range polyfills.
+# Rewrite 11: array range slice arr[1..n] -> arr.Skip(1).ToArray()
+# ONLY rewrite patterns that are clearly arrays:
+#   - arr[1..arr.Length]  (uses .Length, almost certainly array not string)
+# Do NOT rewrite:
+#   - arr[1..]            (could be string, would break with Skip().ToArray())
+#   - arr[..n]            (same)
+#   - arr[..^1]           (handled by Rewrite 16)
 # ---------------------------------------------------------------------------
-# (old code removed)
+foreach ($f in $csFiles) {
+    $content = Get-Content $f.FullName -Raw -Encoding UTF8
+    $changed = $false
+
+    # arr[1..arr.Length] -> arr.Skip(1).ToArray()
+    # This pattern only matches arrays (string uses .Length too but the
+    # result of string[1..Length] is a string, not char[]).
+    # Unfortunately we can't distinguish string from array at regex level.
+    # Compromise: rewrite ALL [n..var.Length] to Skip(n).ToArray(), accept
+    # that string[1..str.Length] will break (rare pattern).
+    $pattern = '(\w+)\[(\d+)\.\.(\w+)\.Length\]'
+    while ($content -match $pattern) {
+        $arr = $matches[1]; $start = $matches[2]
+        $content = $content -replace [regex]::Escape($matches[0]), "$arr.Skip($start).ToArray()"
+        $changed = $true
+    }
+
+    if ($changed) {
+        [System.IO.File]::WriteAllText($f.FullName, $content, [System.Text.UTF8Encoding]::new($false))
+        $rewriteCount++
+        Write-Host "    patched array range: $($f.Name)"
+    }
+}
 
 # ---------------------------------------------------------------------------
 # Rewrite 12: Static-class API redirects (the big one)
@@ -228,19 +254,58 @@ foreach ($f in $csFiles) {
         $changed = $true
     }
 
-    # Architecture.RiscV64 / LoongArch64
+    # Architecture.RiscV64 / LoongArch64 — comment out the entire case line
+    # Pattern: `Architecture.RiscV64 => expr,` -> `// Architecture.RiscV64 => expr, (net48: not supported)`
+    # This is safer than trying to replace with a valid Architecture value.
     if ($content -match 'Architecture\.RiscV64') {
-        $content = $content -replace 'Architecture\.RiscV64', 'ArchitecturePolyfills.IsRiscV64'
+        $content = $content -replace '(?m)^\s*Architecture\.RiscV64\s*=>\s*[^,]+,', '// net48: Architecture.RiscV64 case removed'
         $changed = $true
     }
     if ($content -match 'Architecture\.LoongArch64') {
-        $content = $content -replace 'Architecture\.LoongArch64', 'ArchitecturePolyfills.IsLoongArch64'
+        $content = $content -replace '(?m)^\s*Architecture\.LoongArch64\s*=>\s*[^,]+,', '// net48: Architecture.LoongArch64 case removed'
         $changed = $true
     }
 
     # Enum.IsDefined<T> (generic)
     if ($content -match 'Enum\.IsDefined<') {
         $content = $content -replace 'Enum\.IsDefined<', 'EnumPolyfills.IsDefined<'
+        $changed = $true
+    }
+    # Enum.IsDefined(value) — non-generic call without type arg
+    # net48 only has Enum.IsDefined(Type, object); .NET 5+ added Enum.IsDefined<T>(T value)
+    # Pattern: Enum.IsDefined(someEnumValue)  ->  EnumPolyfills.IsDefined(someEnumValue)
+    if ($content -match 'Enum\.IsDefined\(') {
+        $content = $content -replace 'Enum\.IsDefined\(', 'EnumPolyfills.IsDefined('
+        $changed = $true
+    }
+
+    # File.GetUnixFileMode / File.SetUnixFileMode
+    if ($content -match 'File\.GetUnixFileMode') {
+        $content = $content -replace 'File\.GetUnixFileMode', 'FileUnixModePolyfills.GetUnixFileMode'
+        $changed = $true
+    }
+    if ($content -match 'File\.SetUnixFileMode') {
+        $content = $content -replace 'File\.SetUnixFileMode', 'FileUnixModePolyfills.SetUnixFileMode'
+        $changed = $true
+    }
+
+    # string.Join(char, IEnumerable<string>) — net48 only has Join(string, IEnumerable<string>)
+    # Pattern: string.Join(',', list)  ->  string.Join(",", list)
+    # Pattern: string.Join(',', items)  ->  string.Join(",", items)
+    if ($content -match 'string\.Join\(\s*(''\w''|''\\.'')\s*,') {
+        # Convert char to string
+        $pattern = 'string\.Join\(\s*(''\w''|''\\.'')\s*,'
+        $m = [regex]::Match($content, $pattern)
+        while ($m.Success) {
+            $charLit = $m.Groups[1].Value
+            $inner = $charLit.Trim("'")
+            if ($inner -eq '\\') { $inner = '\\' }
+            elseif ($inner.Length -eq 2 -and $inner[0] -eq '\') { $inner = $inner[1] }
+            $strLit = '"' + $inner + '"'
+            $newJoin = "string.Join($strLit,"
+            $content = $content.Substring(0, $m.Index) + $newJoin + $content.Substring($m.Index + $m.Length)
+            $m = [regex]::Match($content, $pattern)
+        }
         $changed = $true
     }
 

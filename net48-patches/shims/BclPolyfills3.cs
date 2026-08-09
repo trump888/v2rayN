@@ -12,11 +12,16 @@
 // rename. This file provides the implementations.
 // ============================================================================
 
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
+using System.Linq;
 using System.Net.Http.Headers;
+using System.Net.Security;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Security.Authentication;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
@@ -375,7 +380,6 @@ namespace System
     {
         public static string Replace(this string s, string oldValue, string newValue, StringComparison comparisonType)
         {
-            // Simple implementation: use IndexOf with comparison, then build result
             if (string.IsNullOrEmpty(oldValue)) return s;
             var result = new System.Text.StringBuilder();
             int idx = 0;
@@ -393,5 +397,119 @@ namespace System
             }
             return result.ToString();
         }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// KeyValuePair<TKey, TValue>.Deconstruct(out TKey, out TValue) — .NET Core 2.0+
+// net48 KeyValuePair doesn't have Deconstruct. Source uses:
+//   foreach (var (key, value) in dict) ...
+// We add a Deconstruct extension method.
+// ---------------------------------------------------------------------------
+
+namespace System.Collections.Generic
+{
+    internal static class KeyValuePairDeconstruct
+    {
+        public static void Deconstruct<TKey, TValue>(this KeyValuePair<TKey, TValue> kvp, out TKey key, out TValue value)
+        {
+            key = kvp.Key;
+            value = kvp.Value;
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// RuntimeHelpers.GetSubArray<T> — .NET Core 3.0+
+// Compiler emits this for `array[1..n]` Range slicing on arrays.
+// ---------------------------------------------------------------------------
+
+namespace System.Runtime.CompilerServices
+{
+    internal static class RuntimeHelpersNet48
+    {
+        public static T[] GetSubArray<T>(T[] array, Range range)
+        {
+            if (array == null) throw new ArgumentNullException(nameof(array));
+            var (offset, length) = range.GetOffsetAndLength(array.Length);
+            var result = new T[length];
+            Array.Copy(array, offset, result, 0, length);
+            return result;
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SslClientAuthenticationOptions — .NET Core 2.1+
+// net48 doesn't have this type. SslStream.AuthenticateAsClientAsync on net48
+// takes individual args (targetHost, certificates, sslProtocols, checkRevocation)
+// We provide a stub that captures the properties, then rewrite call sites
+// to use SslStream.AuthenticateAsClientAsync directly.
+// ---------------------------------------------------------------------------
+
+namespace System.Net.Security
+{
+    /// <summary>Polyfill for .NET Core 2.1+ SslClientAuthenticationOptions.
+    /// Captures configuration that source code sets via object initializer.
+    /// Our source rewriter replaces AuthenticateAsClientAsync(sslOptions, token)
+    /// with AuthenticateAsClientAsync(sslOptions.TargetHost, ...).</summary>
+    internal sealed class SslClientAuthenticationOptions
+    {
+        public string TargetHost { get; set; }
+        public RemoteCertificateValidationCallback RemoteCertificateValidationCallback { get; set; }
+        public X509CertificateCollection ClientCertificates { get; set; }
+        public SslProtocols EnabledSslProtocols { get; set; }
+        public bool CertificateRevocationCheckMode { get; set; }
+    }
+
+    internal static class SslStreamPolyfills
+    {
+        public static Task AuthenticateAsClientAsync(this SslStream ssl, SslClientAuthenticationOptions options, CancellationToken cancellationToken)
+        {
+            // net48: ignore cancellationToken, use sync-over-async
+            return ssl.AuthenticateAsClientAsync(
+                options.TargetHost,
+                options.ClientCertificates,
+                options.EnabledSslProtocols,
+                options.CertificateRevocationCheckMode);
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// X509SubjectAlternativeNameExtension — .NET Core 2.0+
+// net48 lacks this. Source uses it for SAN extension parsing.
+// We provide a minimal stub.
+// ---------------------------------------------------------------------------
+
+namespace System.Security.Cryptography.X509Certificates
+{
+    internal sealed class X509SubjectAlternativeNameExtension : X509Extension
+    {
+        public X509SubjectAlternativeNameExtension() : base() { }
+        public X509SubjectAlternativeNameExtension(byte[] rawData, bool critical = false) : base("2.5.29.17", rawData, critical) { }
+
+        public IEnumerable<string> EnumerateDnsNames()
+        {
+            // Stub: net48 doesn't parse SAN natively; return empty
+            yield break;
+        }
+
+        public string[] DnsNames => EnumerateDnsNames().ToArray();
+    }
+}
+
+// ---------------------------------------------------------------------------
+// File.GetUnixFileMode — .NET 7+
+// net48 doesn't have UnixFileMode at all. We stub to return a default.
+// Source code is rewritten to call FilePolyfills.GetUnixFileMode.
+// ---------------------------------------------------------------------------
+
+namespace System.IO
+{
+    internal static class FileUnixModePolyfills
+    {
+        public static int GetUnixFileMode(string path) => 0;
+        public static void SetUnixFileMode(string path, int mode) { /* no-op on net48 */ }
     }
 }

@@ -175,7 +175,10 @@ namespace System
         }
         public static bool IsDefined<T>(T value) where T : struct
         {
-            return Enum.IsDefined(typeof(T), value);
+            // net48 Enum.IsDefined takes (Type, object)
+            Type t = typeof(T);
+            object boxed = value;
+            return Enum.IsDefined(t, boxed);
         }
     }
 }

@@ -165,6 +165,8 @@ namespace System
         public static bool Contains(this string s, char c) => s.IndexOf(c) >= 0;
         public static bool Contains(this string s, char c, StringComparison _)
             => s.IndexOf(c) >= 0;
+        public static bool Contains(this string s, string value, StringComparison comparison)
+            => s.IndexOf(value, comparison) >= 0;
         public static bool StartsWith(this string s, char c) => s.Length > 0 && s[0] == c;
         public static bool EndsWith(this string s, char c) => s.Length > 0 && s[s.Length - 1] == c;
         public static string Replace(this string s, char oldChar, char newChar)
@@ -175,6 +177,14 @@ namespace System
             => s.Split(new[] { separator }, count, options);
         public static string[] Split(this string s, string separator, StringSplitOptions options = StringSplitOptions.None)
             => s.Split(new[] { separator }, options);
+
+        // string[Range] -> string (compiler emits call to string.get_Chars or
+        // uses Substring. net48 string[Range] is not supported natively, so
+        // we provide a Slice(Range) extension method.
+        // Note: this only works if the source code uses .Slice(range) explicitly,
+        // which our rewriter doesn't do. For string[Range], the compiler emits
+        // RuntimeHelpers.GetSubArray which is net5+ only.
+        // The workaround: rewrite string[Range] to string.Substring() at source level.
     }
 }
 
