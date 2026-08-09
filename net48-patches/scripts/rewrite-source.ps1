@@ -123,12 +123,12 @@ foreach ($f in $csFiles) {
     $content = Get-Content $f.FullName -Raw -Encoding UTF8
     $changed = $false
 
-    $pattern = '\.Split\(\s*(''\w''|''\\.'')\s*,\s*([A-Za-z_][A-Za-z0-9_.]*)\s*\)'
+    $pattern = "\.Split\(\s*('\w'|'\\.')\s*,\s*([A-Za-z_][A-Za-z0-9_.]*)\s*\)"
     while ($content -match $pattern) {
         $content = $content -replace $pattern, ".Split(new[] { `$1 }, `$2)"
         $changed = $true
     }
-    $pattern2 = '\.Split\(\s*(''\w''|''\\.'')\s*\)'
+    $pattern2 = "\.Split\(\s*('\w'|'\\.')\s*\)"
     while ($content -match $pattern2) {
         $content = $content -replace $pattern2, ".Split(new[] { `$1 })"
         $changed = $true
@@ -175,7 +175,7 @@ foreach ($f in $csFiles) {
 # ---------------------------------------------------------------------------
 foreach ($f in $csFiles) {
     $content = Get-Content $f.FullName -Raw -Encoding UTF8
-    $pattern = '\.Contains\(\s*(''\w''|''\\.'')\s*,\s*(StringComparison\.[A-Za-z]+)\s*\)'
+    $pattern = "\.Contains\(\s*('\w'|'\\.')\s*,\s*(StringComparison\.[A-Za-z]+)\s*\)"
     if ($content -match $pattern) {
         $content = $content -replace $pattern, '.IndexOf($1, $2) >= 0'
         [System.IO.File]::WriteAllText($f.FullName, $content, [System.Text.UTF8Encoding]::new($false))
@@ -367,7 +367,8 @@ foreach ($f in $csFiles) {
 
     # string.Join(char, IEnumerable<string>) — net48 only has Join(string, IEnumerable<string>)
     # Convert char literal to string literal: string.Join(',', ... -> string.Join(",", ...
-    $pattern = 'string\.Join\(\s*(''[^\']'')\s*,'
+    # Use double-quoted string to avoid PowerShell single-quote escaping issues
+    $pattern = "string\.Join\(\s*('[^']')\s*,"
     $m = [regex]::Match($content, $pattern)
     while ($m.Success) {
         $charLit = $m.Groups[1].Value
@@ -423,7 +424,7 @@ foreach ($f in $csFiles) {
         $changed = $false
         $loops++
         # Match .StartsWith('x') or .EndsWith('x')
-        $m = [regex]::Match($content, '\.(StartsWith|EndsWith)\(\s*(''\w''|''\\.'')\s*\)')
+        $m = [regex]::Match($content, "\.(StartsWith|EndsWith)\(\s*('\w'|'\\.')\s*\)")
         if ($m.Success) {
             $method = $m.Groups[1].Value
             $charLit = $m.Groups[2].Value
@@ -437,7 +438,7 @@ foreach ($f in $csFiles) {
             $changed = $true
         }
         # Match .StartsWith('x', StringComparison.X)
-        $m2 = [regex]::Match($content, '\.(StartsWith|EndsWith)\(\s*(''\w''|''\\.'')\s*,\s*(StringComparison\.[A-Za-z]+)\s*\)')
+        $m2 = [regex]::Match($content, "\.(StartsWith|EndsWith)\(\s*('\w'|'\\.')\s*,\s*(StringComparison\.[A-Za-z]+)\s*\)")
         if ($m2.Success) {
             $method = $m2.Groups[1].Value
             $charLit = $m2.Groups[2].Value
