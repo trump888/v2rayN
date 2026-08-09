@@ -654,12 +654,13 @@ $simpleView = Join-Path $SourceDir "v2rayN/Common/SimpleViewLocator.cs"
 if (Test-Path $simpleView) {
     $content = Get-Content $simpleView -Raw -Encoding UTF8
     if ($content -notmatch 'net48.*IViewLocator') {
-        # Change signature: add viewModel param AND change return type to IViewFor?
+        # Change signature: add viewModel param, change return type to IViewFor?,
+        # AND remove the "where TViewModel : class" constraint (interface doesn't have it)
         $content = $content -replace
-            'public IViewFor<TViewModel>\? ResolveView<TViewModel>\(string\? contract = null\)',
+            'public IViewFor<TViewModel>\? ResolveView<TViewModel>\(string\? contract = null\) where TViewModel : class',
             'public IViewFor? ResolveView<TViewModel>(TViewModel? viewModel, string? contract = null)'
         [System.IO.File]::WriteAllText($simpleView, $content, [System.Text.UTF8Encoding]::new($false))
-        Write-Host "    patched SimpleViewLocator.cs (IViewLocator signature + return type)"
+        Write-Host "    patched SimpleViewLocator.cs (IViewLocator signature + return type + constraint)"
     }
 }
 
