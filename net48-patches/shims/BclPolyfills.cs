@@ -178,13 +178,14 @@ namespace System
         public static string[] Split(this string s, string separator, StringSplitOptions options = StringSplitOptions.None)
             => s.Split(new[] { separator }, options);
 
-        // string[Range] -> string (compiler emits call to string.get_Chars or
-        // uses Substring. net48 string[Range] is not supported natively, so
-        // we provide a Slice(Range) extension method.
-        // Note: this only works if the source code uses .Slice(range) explicitly,
-        // which our rewriter doesn't do. For string[Range], the compiler emits
-        // RuntimeHelpers.GetSubArray which is net5+ only.
-        // The workaround: rewrite string[Range] to string.Substring() at source level.
+        // string.Chunk(int size) — .NET 6+ returns IEnumerable<ReadOnlyMemory<char>>
+        // We return IEnumerable<string> for easier consumption.
+        public static System.Collections.Generic.IEnumerable<string> Chunk(this string s, int chunkSize)
+        {
+            if (s == null) yield break;
+            for (int i = 0; i < s.Length; i += chunkSize)
+                yield return s.Substring(i, System.Math.Min(chunkSize, s.Length - i));
+        }
     }
 }
 
@@ -359,13 +360,16 @@ namespace System.Security.Cryptography.X509Certificates
 
     internal static class X509ChainPolicyPolyfills
     {
-        // Note: these are extension methods on the net48 X509ChainPolicy type.
-        // They don't actually persist anything; they just allow the source
-        // to compile. Setters are no-ops; getter returns default.
         public static X509ChainTrustMode get_TrustMode(this X509ChainPolicy _) => X509ChainTrustMode.System;
         public static void set_TrustMode(this X509ChainPolicy _, X509ChainTrustMode value) { /* no-op */ }
         public static X509Certificate2Collection get_CustomTrustStore(this X509ChainPolicy _) => new X509Certificate2Collection();
         public static void set_CustomTrustStore(this X509ChainPolicy _, X509Certificate2Collection value) { /* no-op */ }
+        // For statement form: chainPolicy.CustomTrustStore.AddRange(certs)
+        // We can't make that work via extension; rewrite to AddToCustomTrustStore.
+        public static void AddToCustomTrustStore(this X509ChainPolicy policy, X509Certificate2Collection certs)
+        {
+            // net48: no-op (system trust store only)
+        }
     }
 }
 

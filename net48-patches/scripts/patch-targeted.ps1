@@ -104,7 +104,7 @@ if (Test-Path $downloader) {
         $content = $content -replace 'SocketsHttpHandler', 'HttpClientHandler'
 
         # Remove entire property blocks that HttpClientHandler doesn't support
-        # by wrapping them in #if false ... #endif
+        # Match any variable name (handler, webRequestHandler, etc.)
         $propsToRemove = @(
             'MaxConnectionsPerServer',
             'PooledConnectionIdleTimeout',
@@ -117,10 +117,10 @@ if (Test-Path $downloader) {
             'SslOptions'
         )
         foreach ($prop in $propsToRemove) {
-            # Match: handler.PropertyName = value,  (single line)
-            $content = $content -replace "(?m)^\s*handler\.$prop\s*=\s*[^;]+;\s*$", "            /* net48: $prop not available on HttpClientHandler */"
-            # Match: handler.SslOptions.SubProp = value;
-            $content = $content -replace "(?m)^\s*handler\.SslOptions\.[^;]+;\s*$", "            /* net48: SslOptions not available */"
+            # Statement form: anyVar.Prop = value;
+            $content = $content -replace "(?m)^\s*\w+\.$prop\s*=\s*[^;]+;\s*$", "            /* net48: $prop not available on HttpClientHandler */"
+            # anyVar.SslOptions.SubProp = value;
+            $content = $content -replace "(?m)^\s*\w+\.SslOptions\.[^;]+;\s*$", "            /* net48: SslOptions not available */"
         }
 
         # Remove Downloader 5.x-only config properties
@@ -178,9 +178,9 @@ if (Test-Path $downloadSvc) {
             'SslOptions'
         )
         foreach ($prop in $propsToRemove) {
-            # Statement form
-            $content = $content -replace "(?m)^\s*handler\.$prop\s*=\s*[^;]+;\s*$", "            /* net48: $prop not available */"
-            $content = $content -replace "(?m)^\s*handler\.SslOptions\.[^;]+;\s*$", "            /* net48: SslOptions not available */"
+            # Statement form: anyVar.Prop = value;
+            $content = $content -replace "(?m)^\s*\w+\.$prop\s*=\s*[^;]+;\s*$", "            /* net48: $prop not available */"
+            $content = $content -replace "(?m)^\s*\w+\.SslOptions\.[^;]+;\s*$", "            /* net48: SslOptions not available */"
             # Initializer form: Prop = value,  -> DELETE entire line
             $content = $content -replace "(?m)^(\s*)$prop\s*=\s*[^,\r\n]+,\s*$", ""
         }
@@ -202,8 +202,8 @@ if (Test-Path $connectionHandler) {
     if ($content -match 'HttpClientHandler' -and $content -notmatch 'NET48 PORT: ConnectionHandler stripped') {
         $propsToRemove = @('ConnectTimeout', 'SslOptions', 'PooledConnectionIdleTimeout', 'PooledConnectionLifetime')
         foreach ($prop in $propsToRemove) {
-            $content = $content -replace "(?m)^\s*handler\.$prop\s*=\s*[^;]+;\s*$", "            /* net48: $prop */"
-            $content = $content -replace "(?m)^\s*handler\.SslOptions\.[^;]+;\s*$", "            /* net48: SslOptions */"
+            $content = $content -replace "(?m)^\s*\w+\.$prop\s*=\s*[^;]+;\s*$", "            /* net48: $prop */"
+            $content = $content -replace "(?m)^\s*\w+\.SslOptions\.[^;]+;\s*$", "            /* net48: SslOptions */"
             $content = $content -replace "(?m)^(\s*)$prop\s*=\s*[^,\r\n]+,?\s*$", ""
         }
         $content = "// NET48 PORT: ConnectionHandler stripped`n" + $content

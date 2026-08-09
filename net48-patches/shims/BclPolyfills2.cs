@@ -222,6 +222,19 @@ namespace System
     }
 }
 
+namespace System.Collections.Concurrent
+{
+    internal static class ConcurrentBagPolyfills
+    {
+        /// <summary>ConcurrentBag.Clear() — .NET Core 2.0+.
+        /// net48 ConcurrentBag doesn't have Clear(). We use a loop.</summary>
+        public static void Clear<T>(this ConcurrentBag<T> bag)
+        {
+            while (!bag.IsEmpty) bag.TryTake(out _);
+        }
+    }
+}
+
 namespace System.Linq
 {
     internal static class LinqPolyfills

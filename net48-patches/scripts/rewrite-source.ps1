@@ -14,7 +14,9 @@ $ErrorActionPreference = "Stop"
 $SourceDir = (Resolve-Path $SourceDir).Path
 
 $csFiles = Get-ChildItem -Path $SourceDir -Recurse -Filter "*.cs" |
-    Where-Object { $_.FullName -notmatch "\\(obj|bin)\\" -and $_.FullName -notmatch "\.bak" }
+    Where-Object { $_.FullName -notmatch "\\(obj|bin)\\" -and
+                   $_.FullName -notmatch "\.bak" -and
+                   $_.Name -notmatch "BclPolyfills|Polyfills|IsExternalInit|SupportedOSPlatform|RxSchedulers|BinaryPrimitives" }
 
 Write-Host "  Scanning $($csFiles.Count) .cs files"
 
@@ -135,6 +137,36 @@ foreach ($f in $csFiles) {
         [System.IO.File]::WriteAllText($f.FullName, $content, [System.Text.UTF8Encoding]::new($false))
         $rewriteCount++
         Write-Host "    patched .Split(char): $($f.Name)"
+    }
+}
+
+# ---------------------------------------------------------------------------
+# Rewrite 9c: .Split("sep", count) -> .Split(new[] { "sep" }, count, StringSplitOptions.None)
+# net48 string.Split doesn't have (string, int) overload
+# ---------------------------------------------------------------------------
+foreach ($f in $csFiles) {
+    $content = Get-Content $f.FullName -Raw -Encoding UTF8
+    $pattern = '\.Split\(\s*("[^"]*")\s*,\s*(\d+)\s*\)'
+    if ($content -match $pattern) {
+        $content = $content -replace $pattern, '.Split(new[] { $1 }, $2, StringSplitOptions.None)'
+        [System.IO.File]::WriteAllText($f.FullName, $content, [System.Text.UTF8Encoding]::new($false))
+        $rewriteCount++
+        Write-Host "    patched .Split(string, count): $($f.Name)"
+    }
+}
+
+# ---------------------------------------------------------------------------
+# Rewrite 9d: int.TryParse(x.AsSpan(n), out var y) -> int.TryParse(x.Substring(n), out var y)
+# net48 int.TryParse doesn't accept ReadOnlySpan<char>
+# ---------------------------------------------------------------------------
+foreach ($f in $csFiles) {
+    $content = Get-Content $f.FullName -Raw -Encoding UTF8
+    $pattern = 'int\.TryParse\((\w+)\.AsSpan\((\w+)\)\s*,'
+    if ($content -match $pattern) {
+        $content = $content -replace $pattern, 'int.TryParse($1.Substring($2),'
+        [System.IO.File]::WriteAllText($f.FullName, $content, [System.Text.UTF8Encoding]::new($false))
+        $rewriteCount++
+        Write-Host "    patched int.TryParse(AsSpan): $($f.Name)"
     }
 }
 
@@ -306,34 +338,51 @@ foreach ($f in $csFiles) {
         $changed = $true
     }
 
+    # File.Move(src, dst, overwrite) -> FileMovePolyfills.Move(src, dst, overwrite)
+    # ONLY rewrite if 3-arg form
+    if ($content -match 'File\.Move\([^)]*,[^,]*,[^)]*\)') {
+        $content = $content -replace 'File\.Move\(', 'FileMovePolyfills.Move('
+        $changed = $true
+    }
+
     # X509Certificate2.CreateFromPem -> X509Certificate2Polyfills.CreateFromPem
     if ($content -match 'X509Certificate2\.CreateFromPem') {
         $content = $content -replace 'X509Certificate2\.CreateFromPem', 'X509Certificate2Polyfills.CreateFromPem'
         $changed = $true
     }
 
-    # X509ChainPolicy.TrustMode / CustomTrustStore — handled by extension
-    # methods in BclPolyfills.cs (get_TrustMode/set_TrustMode).
-    # Source code `policy.TrustMode = X` resolves to set_TrustMode(X) automatically.
-    # No rewrite needed.
+    # X509ChainPolicy.TrustMode / CustomTrustStore — in initializer form,
+    # DELETE the entire line (extension methods don't work in initializers).
+    # Pattern: TrustMode = X509ChainTrustMode.CustomRootTrust,
+    if ($content -match 'TrustMode\s*=\s*X509ChainTrustMode') {
+        $content = $content -replace "(?m)^\s*TrustMode\s*=\s*X509ChainTrustMode\.\w+,\s*$", "// net48: TrustMode not available in initializer"
+        $changed = $true
+    }
+    # CustomTrustStore.AddRange(...) in statement form — keep (works via extension)
+    # But CustomTrustStore = new X509Certificate2Collection() in initializer — delete
+    if ($content -match 'CustomTrustStore\s*=\s*new') {
+        $content = $content -replace "(?m)^\s*CustomTrustStore\s*=\s*new[^,]+,\s*$", "// net48: CustomTrustStore not available in initializer"
+        $changed = $true
+    }
 
     # string.Join(char, IEnumerable<string>) — net48 only has Join(string, IEnumerable<string>)
-    # Pattern: string.Join(',', list)  ->  string.Join(",", list)
-    # Pattern: string.Join(',', items)  ->  string.Join(",", items)
-    if ($content -match 'string\.Join\(\s*(''\w''|''\\.'')\s*,') {
-        # Convert char to string
-        $pattern = 'string\.Join\(\s*(''\w''|''\\.'')\s*,'
-        $m = [regex]::Match($content, $pattern)
-        while ($m.Success) {
-            $charLit = $m.Groups[1].Value
-            $inner = $charLit.Trim("'")
-            if ($inner -eq '\\') { $inner = '\\' }
-            elseif ($inner.Length -eq 2 -and $inner[0] -eq '\') { $inner = $inner[1] }
-            $strLit = '"' + $inner + '"'
-            $newJoin = "string.Join($strLit,"
-            $content = $content.Substring(0, $m.Index) + $newJoin + $content.Substring($m.Index + $m.Length)
-            $m = [regex]::Match($content, $pattern)
+    # Convert char literal to string literal: string.Join(',', ... -> string.Join(",", ...
+    $pattern = 'string\.Join\(\s*(''[^\']'')\s*,'
+    $m = [regex]::Match($content, $pattern)
+    while ($m.Success) {
+        $charLit = $m.Groups[1].Value
+        $inner = $charLit.Trim("'")
+        if ($inner -eq '\\') { $inner = '\\' }
+        elseif ($inner.Length -eq 2 -and $inner[0] -eq '\') {
+            # keep escape sequences like \n, \t, \r
+            $inner = $inner
         }
+        $strLit = '"' + $inner + '"'
+        $newJoin = "string.Join($strLit,"
+        $content = $content.Substring(0, $m.Index) + $newJoin + $content.Substring($m.Index + $m.Length)
+        $m = [regex]::Match($content, $pattern)
+    }
+    if ($content -match 'string\.Join\(\s*"[^"]*"\s*,') {
         $changed = $true
     }
 

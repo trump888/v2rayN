@@ -521,6 +521,16 @@ namespace System.Security.Cryptography.X509Certificates
     // NOTE: X509Certificate2Polyfills and X509ChainPolicyPolyfills are defined
     // in BclPolyfills.cs (together with their extension methods). Do not
     // re-declare them here — causes CS0101 duplicate definition.
+
+    /// <summary>X509ChainElementCollection doesn't implement IEnumerable<T> on
+    /// net48, so .Select() doesn't work. We provide a Cast extension.</summary>
+    internal static class X509ChainElementCollectionPolyfills
+    {
+        public static IEnumerable<X509ChainElement> AsEnumerable(this X509ChainElementCollection col)
+        {
+            foreach (var item in col) yield return item;
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -561,6 +571,18 @@ namespace System.IO
             if (overwrite && System.IO.Directory.Exists(destDir))
                 System.IO.Directory.Delete(destDir, recursive: true);
             System.IO.Directory.Move(sourceDir, destDir);
+        }
+    }
+
+    /// <summary>File.Move(string, string, bool) — .NET Core 2.1+ overload
+    /// with overwrite flag. net48 only has 2-arg File.Move.</summary>
+    internal static class FileMovePolyfills
+    {
+        public static void Move(string sourceFile, string destFile, bool overwrite)
+        {
+            if (overwrite && System.IO.File.Exists(destFile))
+                System.IO.File.Delete(destFile);
+            System.IO.File.Move(sourceFile, destFile);
         }
     }
 }
