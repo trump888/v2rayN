@@ -272,10 +272,12 @@ foreach ($f in $csFiles) {
         $changed = $true
     }
     # Enum.IsDefined(value) — non-generic call without type arg
-    # net48 only has Enum.IsDefined(Type, object); .NET 5+ added Enum.IsDefined<T>(T value)
-    # Pattern: Enum.IsDefined(someEnumValue)  ->  EnumPolyfills.IsDefined(someEnumValue)
-    if ($content -match 'Enum\.IsDefined\(') {
-        $content = $content -replace 'Enum\.IsDefined\(', 'EnumPolyfills.IsDefined('
+    # ONLY rewrite if NOT followed by `typeof` (i.e. the .NET 5+ single-arg form)
+    # Pattern: Enum.IsDefined(notTypeofExpression)
+    # Use negative lookahead: Enum.IsDefined(  followed by something that's NOT `typeof`
+    $pattern = 'Enum\.IsDefined\((?!typeof)'
+    if ($content -match $pattern) {
+        $content = $content -replace $pattern, 'EnumPolyfills.IsDefined('
         $changed = $true
     }
 
@@ -288,6 +290,32 @@ foreach ($f in $csFiles) {
         $content = $content -replace 'File\.SetUnixFileMode', 'FileUnixModePolyfills.SetUnixFileMode'
         $changed = $true
     }
+
+    # CliWrap BufferedCommandResult.IsSuccess -> IsSuccessPolyfill()
+    if ($content -match '\.IsSuccess\b') {
+        $content = $content -replace '\.IsSuccess\b', '.IsSuccessPolyfill()'
+        $changed = $true
+    }
+
+    # Directory.Move(src, dst, overwrite) -> DirectoryPolyfills.Move(src, dst, overwrite)
+    # ONLY rewrite if 3-arg form (has overwrite). 2-arg Directory.Move works on net48.
+    # We detect by looking for 3 args separated by commas inside the parens.
+    # Simple heuristic: if the line has Directory.Move( with 2+ commas in args
+    if ($content -match 'Directory\.Move\([^)]*,[^,]*,[^)]*\)') {
+        $content = $content -replace 'Directory\.Move\(', 'DirectoryPolyfills.Move('
+        $changed = $true
+    }
+
+    # X509Certificate2.CreateFromPem -> X509Certificate2Polyfills.CreateFromPem
+    if ($content -match 'X509Certificate2\.CreateFromPem') {
+        $content = $content -replace 'X509Certificate2\.CreateFromPem', 'X509Certificate2Polyfills.CreateFromPem'
+        $changed = $true
+    }
+
+    # X509ChainPolicy.TrustMode / CustomTrustStore — handled by extension
+    # methods in BclPolyfills.cs (get_TrustMode/set_TrustMode).
+    # Source code `policy.TrustMode = X` resolves to set_TrustMode(X) automatically.
+    # No rewrite needed.
 
     # string.Join(char, IEnumerable<string>) — net48 only has Join(string, IEnumerable<string>)
     # Pattern: string.Join(',', list)  ->  string.Join(",", list)

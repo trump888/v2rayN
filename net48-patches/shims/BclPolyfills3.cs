@@ -362,9 +362,29 @@ namespace System.Net.Sockets
 {
     internal static class SocketPolyfills
     {
-        public static async Task ConnectAsync(this Socket socket, SocketType socketType, ProtocolType protocolType, string host, int port)
+        /// <summary>Socket.ConnectAsync(EndPoint, CancellationToken) — .NET 5+
+        /// net48 only has ConnectAsync(SocketAsyncEventArgs) or blocking Connect(EndPoint).</summary>
+        public static async Task ConnectAsync(this Socket socket, EndPoint endPoint, CancellationToken cancellationToken)
         {
-            await Task.Run(() => socket.Connect(host, port));
+            await Task.Run(() =>
+            {
+                var connectArgs = new SocketAsyncEventArgs
+                {
+                    RemoteEndPoint = endPoint
+                };
+                var tcs = new TaskCompletionSource<bool>();
+                EventHandler<SocketAsyncEventArgs> handler = (s, e) =>
+                {
+                    if (e.SocketError != SocketError.Success)
+                        tcs.SetException(new SocketException((int)e.SocketError));
+                    else
+                        tcs.SetResult(true);
+                };
+                connectArgs.Completed += handler;
+                if (!socket.ConnectAsync(connectArgs))
+                    handler(socket, connectArgs);
+                tcs.Task.Wait();
+            }, cancellationToken);
         }
     }
 }
@@ -497,6 +517,10 @@ namespace System.Security.Cryptography.X509Certificates
 
         public string[] DnsNames => EnumerateDnsNames().ToArray();
     }
+
+    // NOTE: X509Certificate2Polyfills and X509ChainPolicyPolyfills are defined
+    // in BclPolyfills.cs (together with their extension methods). Do not
+    // re-declare them here — causes CS0101 duplicate definition.
 }
 
 // ---------------------------------------------------------------------------
@@ -511,5 +535,32 @@ namespace System.IO
     {
         public static int GetUnixFileMode(string path) => 0;
         public static void SetUnixFileMode(string path, int mode) { /* no-op on net48 */ }
+    }
+
+    /// <summary>CliWrap 3.10+ BufferedCommandResult.IsSuccess polyfill.
+    /// CliWrap 3.6 (last net48-compatible) uses ExitCode == 0 instead.
+    /// Source code is rewritten: result.IsSuccess -> result.IsSuccessPolyfill()
+    /// NOTE: BufferedCommandResult is in namespace CliWrap.Buffered.
+    /// Wrapped in #if because AmazTool doesn't reference CliWrap.</summary>
+#if !AMAZTOOL_NO_CLIWRAP
+    internal static class CliWrapPolyfills
+    {
+        public static bool IsSuccessPolyfill(this CliWrap.Buffered.BufferedCommandResult result)
+        {
+            return result.ExitCode == 0;
+        }
+    }
+#endif
+
+    /// <summary>Directory.Move(string, string, bool) — .NET 8+ overload
+    /// with overwrite flag. net48 only has 2-arg Move.</summary>
+    internal static class DirectoryPolyfills
+    {
+        public static void Move(string sourceDir, string destDir, bool overwrite)
+        {
+            if (overwrite && System.IO.Directory.Exists(destDir))
+                System.IO.Directory.Delete(destDir, recursive: true);
+            System.IO.Directory.Move(sourceDir, destDir);
+        }
     }
 }

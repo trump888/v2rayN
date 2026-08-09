@@ -194,8 +194,23 @@ if (Test-Path $downloadSvc) {
 }
 
 # ---------------------------------------------------------------------------
-# Patch 4: FileUtils.cs — stub DecompressTarFile (TarFile.ExtractToDirectory is net6+)
+# Patch 3c: ConnectionHandler.cs — same treatment (has HttpClientHandler.ConnectTimeout)
 # ---------------------------------------------------------------------------
+$connectionHandler = Join-Path $SourceDir "ServiceLib/Handler/ConnectionHandler.cs"
+if (Test-Path $connectionHandler) {
+    $content = Get-Content $connectionHandler -Raw -Encoding UTF8
+    if ($content -match 'HttpClientHandler' -and $content -notmatch 'NET48 PORT: ConnectionHandler stripped') {
+        $propsToRemove = @('ConnectTimeout', 'SslOptions', 'PooledConnectionIdleTimeout', 'PooledConnectionLifetime')
+        foreach ($prop in $propsToRemove) {
+            $content = $content -replace "(?m)^\s*handler\.$prop\s*=\s*[^;]+;\s*$", "            /* net48: $prop */"
+            $content = $content -replace "(?m)^\s*handler\.SslOptions\.[^;]+;\s*$", "            /* net48: SslOptions */"
+            $content = $content -replace "(?m)^(\s*)$prop\s*=\s*[^,\r\n]+,?\s*$", ""
+        }
+        $content = "// NET48 PORT: ConnectionHandler stripped`n" + $content
+        [System.IO.File]::WriteAllText($connectionHandler, $content, [System.Text.UTF8Encoding]::new($false))
+        Write-Host "  > Patched ConnectionHandler.cs" -ForegroundColor Green
+    }
+}
 $fileUtils = Join-Path $SourceDir "ServiceLib/Common/FileUtils.cs"
 if (Test-Path $fileUtils) {
     $content = Get-Content $fileUtils -Raw -Encoding UTF8

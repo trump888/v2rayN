@@ -14,12 +14,10 @@
     <!-- =========================================================== -->
     <PropertyGroup>
         <TargetFramework>net48</TargetFramework>
-        <!-- C# 13 needed for `partial properties` (used by ReactiveUI.Fody 19.x  -->
-        <!-- to weave [Reactive] properties) and `field` keyword. C# 13 works on -->
-        <!-- net48 with .NET SDK 9+ (Roslyn 4.11+). On SDK 8 use LangVersion 12. -->
-        <!-- But windows-latest has .NET SDK 8 installed by default; we install -->
-        <!-- SDK 9 in the workflow to support C# 13.                            -->
-        <LangVersion>13.0</LangVersion>
+        <!-- C# 13 + preview features. C# 13 needed for partial properties
+             (ReactiveUI.Fody 19.x weaving). Preview needed for null-conditional
+             assignment (obj?.field = value) which is C# 14 preview. -->
+        <LangVersion>preview</LangVersion>
         <CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>
         <Nullable>annotations</Nullable>
         <!-- Original v2rayN uses `<ImplicitUsings>enable</ImplicitUsings>` in    -->

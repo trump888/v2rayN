@@ -99,10 +99,9 @@ $shims = @(
     @{ Src = "shims/BclPolyfills3.cs";          Dst = "ServiceLib/Common/BclPolyfills3.cs" }
     @{ Src = "shims/RxSchedulers.cs";           Dst = "ServiceLib/Common/RxSchedulers.cs" }
     @{ Src = "shims/BinaryPrimitives.cs";       Dst = "ServiceLib.UdpTest/BinaryPrimitives.cs" }
-    # AmazTool also needs polyfills (independent project, doesn't reference ServiceLib)
+    # AmazTool only needs basic polyfills (no CliWrap, no ReactiveUI, no X509)
     @{ Src = "shims/BclPolyfills.cs";           Dst = "AmazTool/BclPolyfills.cs" }
     @{ Src = "shims/BclPolyfills2.cs";          Dst = "AmazTool/BclPolyfills2.cs" }
-    @{ Src = "shims/BclPolyfills3.cs";          Dst = "AmazTool/BclPolyfills3.cs" }
     @{ Src = "shims/SupportedOSPlatform.cs";    Dst = "AmazTool/SupportedOSPlatform.cs" }
     @{ Src = "shims/IsExternalInit.cs";         Dst = "AmazTool/IsExternalInit.cs" }
 )

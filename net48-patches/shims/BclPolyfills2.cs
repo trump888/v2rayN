@@ -175,10 +175,8 @@ namespace System
         }
         public static bool IsDefined<T>(T value) where T : struct
         {
-            // net48 Enum.IsDefined takes (Type, object)
-            Type t = typeof(T);
-            object boxed = value;
-            return Enum.IsDefined(t, boxed);
+            // net48 Enum.IsDefined(Type, object) — must cast explicitly
+            return Enum.IsDefined(typeof(T), (object)value);
         }
     }
 }
@@ -234,12 +232,7 @@ namespace System.Linq
                 if (predicate(item)) return item;
             return defaultValue;
         }
-        public static bool Contains<TSource>(this IEnumerable<TSource> source, TSource value, IEqualityComparer<TSource> comparer)
-        {
-            if (comparer == null) return source.Contains(value);
-            foreach (var item in source)
-                if (comparer.Equals(item, value)) return true;
-            return false;
-        }
+        // NOTE: Contains(source, value, comparer) already exists in net48's
+        // Enumerable. Do NOT add it here — causes CS0121 ambiguity.
     }
 }
