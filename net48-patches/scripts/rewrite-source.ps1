@@ -584,34 +584,22 @@ foreach ($f in $xamlFiles) {
 #   - IViewLocator.ResolveView<T> signature fix
 # ---------------------------------------------------------------------------
 
-# 19a: GlobalUsings.cs — fix DisposeWith ambiguity elegantly
-# Replace `global using System.Reactive.Disposables;` with a type alias
-# for CompositeDisposable only. This hides DisposableMixins (avoiding CS0121)
-# while keeping CompositeDisposable visible. Our DisposeWith in the Fluent
-# namespace becomes the ONLY DisposeWith.
+# 19a: GlobalUsings.cs — restore original (no alias trick needed)
+# We use __DisposeWith to avoid ambiguity with DisposableMixins.DisposeWith
 
-# Define csFilesWpf early (used by 19b)
+# Define csFilesWpf early (used by 19a2 and 19b)
 $csFilesWpf = Get-ChildItem -Path (Join-Path $SourceDir "v2rayN") -Recurse -Filter "*.cs" |
     Where-Object { $_.FullName -notmatch "\\(obj|bin)\\" }
 
-$globalUsingsWpf = Join-Path $SourceDir "v2rayN/GlobalUsings.cs"
-if (Test-Path $globalUsingsWpf) {
-    $content = Get-Content $globalUsingsWpf -Raw -Encoding UTF8
-    $changed = $false
-
-    # Replace: global using System.Reactive.Disposables;
-    # With:   global using CompositeDisposable = System.Reactive.Disposables.CompositeDisposable;
-    if ($content -match 'global using System\.Reactive\.Disposables;') {
-        $content = $content -replace
-            'global using System\.Reactive\.Disposables;',
-            'global using CompositeDisposable = System.Reactive.Disposables.CompositeDisposable;'
-        $changed = $true
-    }
-    # Keep: global using System.Reactive.Disposables.Fluent; (our DisposeWith lives here)
-
-    if ($changed) {
-        [System.IO.File]::WriteAllText($globalUsingsWpf, $content, [System.Text.UTF8Encoding]::new($false))
-        Write-Host "    patched v2rayN/GlobalUsings.cs (DisposableMixins hidden via alias)"
+# 19a2: Rewrite .DisposeWith( -> .__DisposeWith( in ALL WPF source files
+# This avoids any ambiguity with DisposableMixins (different method name)
+foreach ($f in $csFilesWpf) {
+    $content = Get-Content $f.FullName -Raw -Encoding UTF8
+    if ($content -match '\.DisposeWith\(') {
+        $content = $content -replace '\.DisposeWith\(', '.__DisposeWith('
+        [System.IO.File]::WriteAllText($f.FullName, $content, [System.Text.UTF8Encoding]::new($false))
+        $rewriteCount++
+        Write-Host "    patched DisposeWith->__DisposeWith: $($f.Name)"
     }
 }
 
