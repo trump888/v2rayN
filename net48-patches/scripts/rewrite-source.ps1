@@ -584,26 +584,38 @@ foreach ($f in $xamlFiles) {
 #   - IViewLocator.ResolveView<T> signature fix
 # ---------------------------------------------------------------------------
 
-# 19a: GlobalUsings.cs — comment out System.Reactive.Disposables.Fluent
-# (net48's DisposableMixins already has DisposeWith; our shim caused CS0121 ambiguity)
-# ReactiveUI.Builder is now provided by WpfPolyfills.cs, so keep that using.
+# 19a: GlobalUsings.cs — fix DisposeWith ambiguity elegantly
+# Replace `global using System.Reactive.Disposables;` with a type alias
+# for CompositeDisposable only. This hides DisposableMixins (avoiding CS0121)
+# while keeping CompositeDisposable visible. Our DisposeWith in the Fluent
+# namespace becomes the ONLY DisposeWith.
+
+# Define csFilesWpf early (used by 19b)
+$csFilesWpf = Get-ChildItem -Path (Join-Path $SourceDir "v2rayN") -Recurse -Filter "*.cs" |
+    Where-Object { $_.FullName -notmatch "\\(obj|bin)\\" }
+
 $globalUsingsWpf = Join-Path $SourceDir "v2rayN/GlobalUsings.cs"
 if (Test-Path $globalUsingsWpf) {
     $content = Get-Content $globalUsingsWpf -Raw -Encoding UTF8
     $changed = $false
-    if ($content -match 'global using System\.Reactive\.Disposables\.Fluent;') {
-        $content = $content -replace 'global using System\.Reactive\.Disposables\.Fluent;', '// global using System.Reactive.Disposables.Fluent; // net48: DisposableMixins already has DisposeWith'
+
+    # Replace: global using System.Reactive.Disposables;
+    # With:   global using CompositeDisposable = System.Reactive.Disposables.CompositeDisposable;
+    if ($content -match 'global using System\.Reactive\.Disposables;') {
+        $content = $content -replace
+            'global using System\.Reactive\.Disposables;',
+            'global using CompositeDisposable = System.Reactive.Disposables.CompositeDisposable;'
         $changed = $true
     }
+    # Keep: global using System.Reactive.Disposables.Fluent; (our DisposeWith lives here)
+
     if ($changed) {
         [System.IO.File]::WriteAllText($globalUsingsWpf, $content, [System.Text.UTF8Encoding]::new($false))
-        Write-Host "    patched v2rayN/GlobalUsings.cs (commented Fluent namespace)"
+        Write-Host "    patched v2rayN/GlobalUsings.cs (DisposableMixins hidden via alias)"
     }
 }
 
 # 19b: HotkeyManager.cs and WindowsUtils.cs — LibraryImport -> DllImport
-$csFilesWpf = Get-ChildItem -Path (Join-Path $SourceDir "v2rayN") -Recurse -Filter "*.cs" |
-    Where-Object { $_.FullName -notmatch "\\(obj|bin)\\" }
 
 foreach ($f in $csFilesWpf) {
     $content = Get-Content $f.FullName -Raw -Encoding UTF8

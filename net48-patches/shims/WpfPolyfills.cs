@@ -2,24 +2,53 @@
 // WpfPolyfills.cs  --  WPF-specific polyfills for ReactiveUI + MaterialDesign
 // ============================================================================
 // Provides:
+//   - DisposeWith<T>(this T, CompositeDisposable) — NO IDisposable constraint.
+//     Works on IReactiveBinding (which doesn't implement IDisposable on the
+//     interface due to covariance, but the concrete class does at runtime).
 //   - RxAppBuilder stub (from ReactiveUI.Builder, net5+)
 //   - MaterialDesign BaseTheme -> IBaseTheme conversion
 //
-// NOTE: DisposeWith is NOT here — net48's System.Reactive.Disposables.DisposableMixins
-// already provides it. Adding a duplicate causes CS0121 ambiguity.
-// The source code's `global using System.Reactive.Disposables.Fluent;` is
-// harmless (empty namespace), and DisposeWith resolves to DisposableMixins.
+// HOW TO AVOID AMBIGUITY:
+//   net48's DisposableMixins.DisposeWith<T>(where T : IDisposable) is in
+//   namespace System.Reactive.Disposables. Our DisposeWith is in
+//   System.Reactive.Disposables.Fluent. If BOTH namespaces are imported,
+//   IDisposable types see both → CS0121 ambiguity.
+//
+//   Solution: in WPF GlobalUsings.cs, replace:
+//     global using System.Reactive.Disposables;
+//   with:
+//     global using CompositeDisposable = System.Reactive.Disposables.CompositeDisposable;
+//
+//   This makes CompositeDisposable visible (needed everywhere) but does NOT
+//   import DisposableMixins (no more ambiguity). Our DisposeWith in the
+//   Fluent namespace is the ONLY DisposeWith visible.
 // ============================================================================
 
 using System;
 using System.Collections.Generic;
+using System.Reactive.Disposables;
+
+namespace System.Reactive.Disposables.Fluent
+{
+    internal static class FluentDisposableExtensions
+    {
+        /// <summary>
+        /// Adds disposable to the CompositeDisposable for cleanup.
+        /// Accepts ANY type T (no IDisposable constraint) because
+        /// IReactiveBinding's interface doesn't declare IDisposable
+        /// (covariance), but the concrete class implements it at runtime.
+        /// </summary>
+        public static T DisposeWith<T>(this T disposable, CompositeDisposable disposables)
+        {
+            if (disposable is IDisposable d)
+                disposables.Add(d);
+            return disposable;
+        }
+    }
+}
 
 namespace ReactiveUI.Builder
 {
-    /// <summary>
-    /// Stub for RxAppBuilder from ReactiveUI 23+.
-    /// ReactiveUI 19.x doesn't have this builder pattern.
-    /// </summary>
     internal sealed class RxAppBuilder
     {
         internal static RxAppBuilder CreateReactiveUIBuilder() => new RxAppBuilder();
@@ -30,23 +59,14 @@ namespace ReactiveUI.Builder
 
 namespace MaterialDesignThemes.Wpf
 {
-    /// <summary>
-    /// MaterialDesignThemes 3.2.0's Theme.SetBaseTheme takes IBaseTheme,
-    /// but 5.x uses BaseTheme enum. BaseTheme implements IBaseTheme on 5.x
-    /// but not on 3.2.0. We provide conversion via Theme.Light/BaseTheme.Inherit.
-    /// </summary>
     internal static class MaterialDesignThemePolyfills
     {
         public static void SetBaseTheme(this ITheme theme, BaseTheme baseTheme)
         {
-            // MaterialDesign 3.2.0: Theme.SetBaseTheme(IBaseTheme)
-            // BaseTheme is an enum; convert to IBaseTheme via Theme.GetBaseTheme()
             if (baseTheme == BaseTheme.Dark)
                 theme.SetBaseTheme(Theme.Dark);
-            else if (baseTheme == BaseTheme.Light)
-                theme.SetBaseTheme(Theme.Light);
             else
-                theme.SetBaseTheme(Theme.Inherit);
+                theme.SetBaseTheme(Theme.Light);
         }
     }
 }
