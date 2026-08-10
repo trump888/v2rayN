@@ -1,0 +1,48 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+# NET48 PORT: stripped v2rayN.Desktop (Avalonia), ServiceLib.UdpTest, and
+# ServiceLib.Tests from the solution.
+#   - v2rayN.Desktop : Avalonia UI (we ship WPF only)
+#   - ServiceLib.UdpTest : requires .NET 5+ Stream/Udp APIs; would add 40 CS errors
+#   - ServiceLib.Tests : causes file-lock contention with ServiceLib during
+#                       parallel build (MSB3554); tests aren't shipped anyway.
+VisualStudioVersion = 17.8.34330.188
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "v2rayN", "v2rayN\v2rayN.csproj", "{6DE127CA-1763-4236-B297-D2EF9CB2EC9B}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ServiceLib", "ServiceLib\ServiceLib.csproj", "{1B6456C4-FFAA-4298-80F6-7B689A6E9243}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AmazTool", "AmazTool\AmazTool.csproj", "{47D68B1C-601C-4C69-873B-FFF0DC13EC97}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Files", "Solution Files", "{02EA681E-C7D8-13C7-8484-4AC65E1B71E8}"
+        ProjectSection(SolutionItems) = preProject
+                Directory.Build.props = Directory.Build.props
+                Directory.Packages.props = Directory.Packages.props
+        EndProjectSection
+EndProject
+Global
+        GlobalSection(SolutionConfigurationPlatforms) = preSolution
+                Debug|Any CPU = Debug|Any CPU
+                Release|Any CPU = Release|Any CPU
+        EndGlobalSection
+        GlobalSection(ProjectConfigurationPlatforms) = postSolution
+                {6DE127CA-1763-4236-B297-D2EF9CB2EC9B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+                {6DE127CA-1763-4236-B297-D2EF9CB2EC9B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+                {6DE127CA-1763-4236-B297-D2EF9CB2EC9B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+                {6DE127CA-1763-4236-B297-D2EF9CB2EC9B}.Release|Any CPU.Build.0 = Release|Any CPU
+                {1B6456C4-FFAA-4298-80F6-7B689A6E9243}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+                {1B6456C4-FFAA-4298-80F6-7B689A6E9243}.Debug|Any CPU.Build.0 = Debug|Any CPU
+                {1B6456C4-FFAA-4298-80F6-7B689A6E9243}.Release|Any CPU.ActiveCfg = Release|Any CPU
+                {1B6456C4-FFAA-4298-80F6-7B689A6E9243}.Release|Any CPU.Build.0 = Release|Any CPU
+                {47D68B1C-601C-4C69-873B-FFF0DC13EC97}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+                {47D68B1C-601C-4C69-873B-FFF0DC13EC97}.Debug|Any CPU.Build.0 = Debug|Any CPU
+                {47D68B1C-601C-4C69-873B-FFF0DC13EC97}.Release|Any CPU.ActiveCfg = Release|Any CPU
+                {47D68B1C-601C-4C69-873B-FFF0DC13EC97}.Release|Any CPU.Build.0 = Release|Any CPU
+        EndGlobalSection
+        GlobalSection(SolutionProperties) = preSolution
+                HideSolutionNode = FALSE
+        EndGlobalSection
+        GlobalSection(ExtensibilityGlobals) = postSolution
+                SolutionGuid = {43E06CBD-3DA9-40A3-8E4D-F0943CB0DD32}
+        EndGlobalSection
+EndGlobal
