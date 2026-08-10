@@ -584,8 +584,17 @@ foreach ($f in $xamlFiles) {
 #   - IViewLocator.ResolveView<T> signature fix
 # ---------------------------------------------------------------------------
 
-# 19a: GlobalUsings.cs — restore original (no alias trick needed)
-# We use __DisposeWith to avoid ambiguity with DisposableMixins.DisposeWith
+# 19a: GlobalUsings.cs — comment out System.Reactive.Disposables.Fluent
+# (we use __DisposeWith in v2rayN.Common namespace, not Fluent.DisposeWith)
+$globalUsingsWpf = Join-Path $SourceDir "v2rayN/GlobalUsings.cs"
+if (Test-Path $globalUsingsWpf) {
+    $content = Get-Content $globalUsingsWpf -Raw -Encoding UTF8
+    if ($content -match 'global using System\.Reactive\.Disposables\.Fluent;') {
+        $content = $content -replace 'global using System\.Reactive\.Disposables\.Fluent;', '// global using System.Reactive.Disposables.Fluent;'
+        [System.IO.File]::WriteAllText($globalUsingsWpf, $content, [System.Text.UTF8Encoding]::new($false))
+        Write-Host "    patched v2rayN/GlobalUsings.cs (commented Fluent namespace)"
+    }
+}
 
 # Define csFilesWpf early (used by 19a2 and 19b)
 $csFilesWpf = Get-ChildItem -Path (Join-Path $SourceDir "v2rayN") -Recurse -Filter "*.cs" |
