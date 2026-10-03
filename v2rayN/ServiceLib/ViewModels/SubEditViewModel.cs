@@ -7,6 +7,15 @@ public partial class SubEditViewModel : MyReactiveObject, ICloseable
     [Reactive]
     public partial SubItem SelectedSource { get; set; }
 
+    [Reactive]
+    public partial string CustomCoreType { get; set; }
+
+    [Reactive]
+    public partial string PrevProfile { get; set; }
+
+    [Reactive]
+    public partial string NextProfile { get; set; }
+
     public ReactiveCommand<RxVoid, RxVoid> SelectPrevProfileCmd { get; }
     public ReactiveCommand<RxVoid, RxVoid> SelectNextProfileCmd { get; }
     public ReactiveCommand<RxVoid, RxVoid> SaveCmd { get; }
@@ -20,8 +29,7 @@ public partial class SubEditViewModel : MyReactiveObject, ICloseable
             var profileItem = await SelectProfileAsync();
             if (profileItem != null)
             {
-                SelectedSource?.PrevProfile = profileItem.Remarks;
-                SelectedSource = JsonUtils.DeepCopy(SelectedSource);
+                PrevProfile = profileItem.Remarks;
             }
         });
         SelectNextProfileCmd = ReactiveCommand.CreateFromTask(async () =>
@@ -29,8 +37,7 @@ public partial class SubEditViewModel : MyReactiveObject, ICloseable
             var profileItem = await SelectProfileAsync();
             if (profileItem != null)
             {
-                SelectedSource?.NextProfile = profileItem.Remarks;
-                SelectedSource = JsonUtils.DeepCopy(SelectedSource);
+                NextProfile = profileItem.Remarks;
             }
         });
         SaveCmd = ReactiveCommand.CreateFromTask(async () =>
@@ -39,6 +46,9 @@ public partial class SubEditViewModel : MyReactiveObject, ICloseable
         });
 
         SelectedSource = subItem.Id.IsNullOrEmpty() ? subItem : JsonUtils.DeepCopy(subItem);
+        CustomCoreType = SelectedSource.CustomCoreType?.ToString() ?? string.Empty;
+        PrevProfile = SelectedSource.PrevProfile;
+        NextProfile = SelectedSource.NextProfile;
     }
 
     private async Task SaveSubAsync()
@@ -66,6 +76,16 @@ public partial class SubEditViewModel : MyReactiveObject, ICloseable
                 //return;
             }
         }
+
+        if (!HttpRequestHeadersHelper.TryParse(SelectedSource.RequestHeaders, out _))
+        {
+            NoticeManager.Instance.Enqueue(ResUI.SubRequestHeadersInvalid);
+            return;
+        }
+
+        SelectedSource.CustomCoreType = Enum.TryParse<ECoreType>(CustomCoreType, out var coreType) ? coreType : null;
+        SelectedSource.PrevProfile = PrevProfile;
+        SelectedSource.NextProfile = NextProfile;
 
         if (await ConfigHandler.AddSubItem(_config, SelectedSource) == 0)
         {

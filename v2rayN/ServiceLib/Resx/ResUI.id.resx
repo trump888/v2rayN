@@ -1215,7 +1215,7 @@
   <data name="menuModeRule" xml:space="preserve">
     <value>Aturan</value>
   </data>
-  <data name="menuProxiesDelaytest" xml:space="preserve">
+  <data name="menuDelaytest" xml:space="preserve">
     <value>Uji latensi</value>
   </data>
   <data name="menuProxiesDelaytestPart" xml:space="preserve">
@@ -1456,7 +1456,7 @@
     <value>DNS kustom diaktifkan, pengaturan halaman ini tidak berlaku</value>
   </data>
   <data name="TbBlockSVCBHTTPSQueriesTips" xml:space="preserve">
-    <value>Blokir pemeriksaan ketersediaan ECH dan HTTP/3 saat diaktifkan</value>
+    <value>Block ECH and HTTP/3 availability checks when enabled. Always enabled in Xray</value>
   </data>
   <data name="FillCorrectConfigTemplateText" xml:space="preserve">
     <value>Isi template konfigurasi yang benar</value>

@@ -693,6 +693,9 @@
   <data name="TbSettingsEnableCheckPreReleaseUpdate" xml:space="preserve">
     <value>به روز رسانی های پیش از انتشار را بررسی شود</value>
   </data>
+  <data name="TbSettingsEnableUpdateViaProxy" xml:space="preserve">
+    <value>به‌روزرسانی از طریق پروکسی</value>
+  </data>
   <data name="TbSettingsException" xml:space="preserve">
     <value>استثنا</value>
   </data>
@@ -1215,7 +1218,7 @@
   <data name="menuModeRule" xml:space="preserve">
     <value>قانون</value>
   </data>
-  <data name="menuProxiesDelaytest" xml:space="preserve">
+  <data name="menuDelaytest" xml:space="preserve">
     <value>تست تأخیر</value>
   </data>
   <data name="menuProxiesDelaytestPart" xml:space="preserve">
@@ -1456,7 +1459,7 @@
     <value>Custom DNS Enabled, This Page's Settings Invalid</value>
   </data>
   <data name="TbBlockSVCBHTTPSQueriesTips" xml:space="preserve">
-    <value>Block ECH and HTTP/3 availability checks when enabled</value>
+    <value>Block ECH and HTTP/3 availability checks when enabled. Always enabled in Xray</value>
   </data>
   <data name="FillCorrectConfigTemplateText" xml:space="preserve">
     <value>Please fill in the correct config template</value>

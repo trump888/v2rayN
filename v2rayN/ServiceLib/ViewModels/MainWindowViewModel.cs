@@ -32,7 +32,9 @@ public partial class MainWindowViewModel : MyReactiveObject
     public ReactiveCommand<RxVoid, RxVoid> AddWireguardServerCmd { get; }
     public ReactiveCommand<RxVoid, RxVoid> AddAnytlsServerCmd { get; }
     public ReactiveCommand<RxVoid, RxVoid> AddNaiveServerCmd { get; }
+    public ReactiveCommand<RxVoid, RxVoid> AddMasqueServerCmd { get; }
     public ReactiveCommand<RxVoid, RxVoid> AddCustomServerCmd { get; }
+    public ReactiveCommand<RxVoid, RxVoid> AddCustomOutboundServerCmd { get; }
     public ReactiveCommand<RxVoid, RxVoid> AddPolicyGroupServerCmd { get; }
     public ReactiveCommand<RxVoid, RxVoid> AddProxyChainServerCmd { get; }
     public ReactiveCommand<RxVoid, RxVoid> AddServerViaClipboardCmd { get; }
@@ -139,9 +141,17 @@ public partial class MainWindowViewModel : MyReactiveObject
         {
             await AddServerAsync(EConfigType.Naive);
         });
+        AddMasqueServerCmd = ReactiveCommand.CreateFromTask(async () =>
+        {
+            await AddServerAsync(EConfigType.MASQUE);
+        });
         AddCustomServerCmd = ReactiveCommand.CreateFromTask(async () =>
         {
             await AddServerAsync(EConfigType.Custom);
+        });
+        AddCustomOutboundServerCmd = ReactiveCommand.CreateFromTask(async () =>
+        {
+            await AddServerAsync(EConfigType.Outbound);
         });
         AddPolicyGroupServerCmd = ReactiveCommand.CreateFromTask(async () =>
         {
@@ -252,19 +262,19 @@ public partial class MainWindowViewModel : MyReactiveObject
         AppEvents.AddServerViaClipboardRequested
             .AsObservable()
             .ObserveOn(RxSchedulers.MainThreadScheduler)
-            .Subscribe(async _ => await AddServerViaClipboardAsync(null));
+            .SubscribeAsync(async _ => await AddServerViaClipboardAsync(null));
 
         AppEvents.HasUpdateNotified
             .AsObservable()
             .ObserveOn(RxSchedulers.MainThreadScheduler)
-            .Subscribe(async bl => BlNewUpdate = bl);
+            .Subscribe(bl => BlNewUpdate = bl);
 
         #endregion AppEvents
 
         ProfilesViewModel.RefreshServersRequested
             .AsObservable()
             .ObserveOn(RxSchedulers.MainThreadScheduler)
-            .Subscribe(async _ => await RefreshServers());
+            .SubscribeAsync(async _ => await RefreshServersDispatcherAsync());
 
         var vmReloadRequestedList = new List<IObservable<RxVoid>>
         {
@@ -277,36 +287,36 @@ public partial class MainWindowViewModel : MyReactiveObject
         {
             reloadRequested
                 .ObserveOn(RxSchedulers.MainThreadScheduler)
-                .Subscribe(async _ => await Reload());
+                .SubscribeAsync(async _ => await Reload());
         }
 
         StatusBarViewModel.AddServerViaScanRequested
             .AsObservable()
             .ObserveOn(RxSchedulers.MainThreadScheduler)
-            .Subscribe(async _ => await AddServerViaScanAsync());
+            .SubscribeAsync(async _ => await AddServerViaScanAsync());
 
         StatusBarViewModel.AddServerViaClipboardRequested
             .AsObservable()
             .ObserveOn(RxSchedulers.MainThreadScheduler)
-            .Subscribe(async _ => await AddServerViaClipboardAsync(null));
+            .SubscribeAsync(async _ => await AddServerViaClipboardAsync(null));
 
         StatusBarViewModel.ShowHideWindowRequested
             .AsObservable()
             .ObserveOn(RxSchedulers.MainThreadScheduler)
-            .Subscribe(async blShow =>
+            .SubscribeAsync(async blShow =>
             {
-                await ShowHideWindowInteraction.Handle(blShow);
+                await ShowHideWindowInteraction.HandleSafe(blShow);
             });
 
         StatusBarViewModel.SetDefaultServerRequested
             .AsObservable()
             .ObserveOn(RxSchedulers.MainThreadScheduler)
-            .Subscribe(async indexId => await ProfilesViewModel.SetDefaultServer(indexId));
+            .SubscribeAsync(async indexId => await ProfilesViewModel.SetDefaultServer(indexId));
 
         StatusBarViewModel.SubscriptionsUpdateRequested
             .AsObservable()
             .ObserveOn(RxSchedulers.MainThreadScheduler)
-            .Subscribe(async blProxy => await UpdateSubscriptionProcess("", blProxy));
+            .SubscribeAsync(async blProxy => await UpdateSubscriptionProcess("", blProxy));
 
         _ = Init();
     }
@@ -395,6 +405,8 @@ public partial class MainWindowViewModel : MyReactiveObject
 
     #region Servers && Groups
 
+    private readonly SemaphoreSlim _refreshServersSemaphore = new(1, 1);
+
     private async Task RefreshServers()
     {
         await ProfilesViewModel.RefreshServersBiz();
@@ -406,33 +418,33 @@ public partial class MainWindowViewModel : MyReactiveObject
     private async Task RefreshServersDispatcherAsync()
     {
         //await Observable.Start(async () => await RefreshServers(), RxSchedulers.MainThreadScheduler);
-
-        var uiContext = SynchronizationContext.Current;
-        if (uiContext != null)
+        await _refreshServersSemaphore.WaitAsync();
+        try
         {
-            var uiSequencer = new SynchronizationContextSequencer(uiContext);
-            uiSequencer.Schedule(() => _ = RefreshServers());
+            await Signal.FromAsync(async () =>
+            {
+                await RefreshServers();
+                return RxVoid.Default;
+            })
+                .SubscribeOn(RxSchedulers.MainThreadScheduler)
+                .ToTask();
         }
-        else
+        finally
         {
-            await RefreshServers();
+            _refreshServersSemaphore.Release();
         }
     }
 
     private async Task RefreshSubscriptions()
     {
         //await Observable.Start(async () => await ProfilesViewModel.RefreshSubscriptions(), RxSchedulers.MainThreadScheduler);
-
-        var uiContext = SynchronizationContext.Current;
-        if (uiContext != null)
-        {
-            var uiSequencer = new SynchronizationContextSequencer(uiContext);
-            uiSequencer.Schedule(() => _ = ProfilesViewModel.RefreshSubscriptions());
-        }
-        else
-        {
-            await ProfilesViewModel.RefreshSubscriptions();
-        }
+        await Signal.FromAsync(async () =>
+            {
+                await ProfilesViewModel.RefreshSubscriptions();
+                return RxVoid.Default;
+            })
+            .SubscribeOn(RxSchedulers.MainThreadScheduler)
+            .ToTask();
     }
 
     #endregion Servers && Groups
@@ -449,7 +461,7 @@ public partial class MainWindowViewModel : MyReactiveObject
         };
 
         bool? ret = false;
-        if (eConfigType == EConfigType.Custom)
+        if (eConfigType is EConfigType.Custom or EConfigType.Outbound)
         {
             var addServer2ViewModel = new AddServer2ViewModel(item);
             ret = await AppManager.Instance.WindowDialog.ShowDialogAsync(addServer2ViewModel);
@@ -479,7 +491,7 @@ public partial class MainWindowViewModel : MyReactiveObject
         var stringData = clipboardData;
         if (clipboardData == null)
         {
-            var result = await ReadTextFromClipboardInteraction.Handle(RxVoid.Default);
+            var result = await ReadTextFromClipboardInteraction.HandleSafe(RxVoid.Default);
             if (result.IsNullOrEmpty())
             {
                 NoticeManager.Instance.Enqueue(ResUI.OperationFailed);
@@ -502,7 +514,7 @@ public partial class MainWindowViewModel : MyReactiveObject
 
     public async Task AddServerViaScanAsync()
     {
-        var result = await ScanScreenInteraction.Handle(RxVoid.Default);
+        var result = await ScanScreenInteraction.HandleSafe(RxVoid.Default);
         await ScanScreenResult(result);
     }
 
@@ -514,7 +526,7 @@ public partial class MainWindowViewModel : MyReactiveObject
 
     public async Task AddServerViaImageAsync()
     {
-        var imageFileName = await BrowseImageFileInteraction.Handle(RxVoid.Default);
+        var imageFileName = await BrowseImageFileInteraction.HandleSafe(RxVoid.Default);
         await AddScanResultAsync(imageFileName);
     }
 
@@ -673,6 +685,13 @@ public partial class MainWindowViewModel : MyReactiveObject
         {
             SetReloadEnabled(false);
 
+            RxSchedulers.MainThreadScheduler.Schedule(() =>
+            {
+                if (TabMainSelectedIndex < 0)
+                {
+                    TabMainSelectedIndex = 0;
+                }
+            });
             var profileItem = await ConfigHandler.GetDefaultServer(_config);
             if (profileItem == null)
             {
@@ -693,7 +712,18 @@ public partial class MainWindowViewModel : MyReactiveObject
             });
             RxSchedulers.MainThreadScheduler.Schedule(async () =>
             {
-                await StatusBarViewModel.TestServerAvailability();
+                var result = await StatusBarViewModel.TestServerAvailability();
+                if (result == null || profileItem.IndexId.IsNullOrEmpty())
+                {
+                    return;
+                }
+
+                await ProfilesViewModel.SetSpeedTestResult(new()
+                {
+                    IndexId = profileItem.IndexId,
+                    IpInfo = result.Ip,
+                    Delay = result.Time > 0 ? result.Time.ToString() : null
+                });
             });
 
             var showClashUI = AppManager.Instance.IsRunningCore(ECoreType.sing_box);
@@ -703,10 +733,12 @@ public partial class MainWindowViewModel : MyReactiveObject
                 //{
                 //    await ClashProxiesViewModel.ProxiesReload();
                 //}, RxSchedulers.MainThreadScheduler);
-                RxSchedulers.MainThreadScheduler.Schedule(async () =>
-                {
-                    await ClashProxiesViewModel.ProxiesReload();
-                });
+                await Signal.FromAsync(async () =>
+                    {
+                        await ClashProxiesViewModel.ProxiesReload();
+                        return RxVoid.Default;
+                    }).SubscribeOn(RxSchedulers.MainThreadScheduler)
+                    .ToTask();
             }
 
             ReloadResult(showClashUI);
@@ -729,7 +761,10 @@ public partial class MainWindowViewModel : MyReactiveObject
         RxSchedulers.MainThreadScheduler.Schedule(() =>
         {
             ShowClashUI = showClashUI;
-            TabMainSelectedIndex = showClashUI ? TabMainSelectedIndex : 0;
+            if (!showClashUI || TabMainSelectedIndex < 0)
+            {
+                TabMainSelectedIndex = 0;
+            }
         });
     }
 

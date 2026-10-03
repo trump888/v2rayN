@@ -11,7 +11,7 @@ public partial class CoreConfigSingboxService
     private List<BaseServer4Sbox> BuildAllProxyOutbounds(string baseTagName = Global.ProxyTag, bool withSelector = true)
     {
         var proxyOutboundList = new List<BaseServer4Sbox>();
-        if (!_node.ConfigType.IsComplexType())
+        if (!_node.ConfigType.IsGroupType())
         {
             var outbound = BuildProxyOutbound(baseTagName);
             proxyOutboundList.Add(outbound);
@@ -35,6 +35,10 @@ public partial class CoreConfigSingboxService
     {
         var outbound = BuildProxyServer();
         outbound.tag = baseTagName;
+        if (_node.ConfigType == EConfigType.Outbound)
+        {
+            context.CustomOutboundMap[outbound] = _node.IndexId;
+        }
         return outbound;
     }
 
@@ -59,7 +63,21 @@ public partial class CoreConfigSingboxService
         try
         {
             var txtOutbound = EmbedUtils.GetEmbedText(Global.SingboxSampleOutbound);
-            if (_node.ConfigType == EConfigType.WireGuard)
+            if (_node.ConfigType == EConfigType.Outbound)
+            {
+                if (_node.GetProtocolExtra().IsSingboxEndpoint == true)
+                {
+                    var endpoint = JsonUtils.Deserialize<Endpoints4Sbox>(txtOutbound);
+                    return endpoint;
+                }
+                else
+                {
+                    var outbound = JsonUtils.Deserialize<Outbound4Sbox>(txtOutbound);
+                    return outbound;
+                }
+            }
+
+            if (_node.ConfigType is EConfigType.WireGuard or EConfigType.MASQUE)
             {
                 var endpoint = JsonUtils.Deserialize<Endpoints4Sbox>(txtOutbound);
                 FillEndpoint(endpoint);
@@ -332,13 +350,13 @@ public partial class CoreConfigSingboxService
         {
             var protocolExtra = _node.GetProtocolExtra();
 
-            endpoint.address = Utils.String2List(protocolExtra.WgInterfaceAddress)?.Select(s => s.Trim()).ToList() ?? ["172.16.0.2/32"];
             endpoint.type = Global.ProtocolTypes[_node.ConfigType];
 
             switch (_node.ConfigType)
             {
                 case EConfigType.WireGuard:
                     {
+                        endpoint.address = Utils.String2List(protocolExtra.WgInterfaceAddress)?.Select(s => s.Trim()).ToList() ?? ["172.16.0.2/32"];
                         var peer = new Peer4Sbox
                         {
                             public_key = protocolExtra.WgPublicKey ?? string.Empty,
@@ -351,6 +369,28 @@ public partial class CoreConfigSingboxService
                         endpoint.private_key = _node.Password;
                         endpoint.mtu = protocolExtra.WgMtu > 0 ? protocolExtra.WgMtu : Global.TunMtus.First();
                         endpoint.peers = [peer];
+                        break;
+                    }
+                case EConfigType.MASQUE:
+                    {
+                        endpoint.type = "masque-client";
+                        endpoint.server = _node.Address;
+                        endpoint.server_port = _node.Port;
+                        endpoint.username = _node.Username;
+                        endpoint.password = _node.Password;
+                        endpoint.path = protocolExtra?.MasquePath.NullIfEmpty();
+                        if (!string.IsNullOrEmpty(protocolExtra?.MasqueHeaders))
+                        {
+                            var headers = Utils.ParseHeaders(protocolExtra.MasqueHeaders)
+                                .GroupBy(x => x.Item1, StringComparer.OrdinalIgnoreCase)
+                                .ToDictionary(
+                                    g => g.Key,
+                                    g => g.Select(x => x.Item2).ToList(),
+                                    StringComparer.OrdinalIgnoreCase
+                                );
+                            endpoint.headers = headers.Count > 0 ? headers : null;
+                        }
+                        FillOutboundTls(endpoint);
                         break;
                     }
             }
@@ -384,7 +424,7 @@ public partial class CoreConfigSingboxService
         }
     }
 
-    private void FillOutboundTls(Outbound4Sbox outbound)
+    private void FillOutboundTls(BaseServer4Sbox server)
     {
         try
         {
@@ -458,7 +498,7 @@ public partial class CoreConfigSingboxService
             {
                 tls.ech = ech;
             }
-            outbound.tls = tls;
+            server.tls = tls;
         }
         catch (Exception ex)
         {
@@ -593,7 +633,7 @@ public partial class CoreConfigSingboxService
         {
             type = "selector",
             tag = baseTagName,
-            outbounds = JsonUtils.DeepCopy(proxyTags),
+            outbounds = [.. proxyTags],
             interrupt_exist_connections = false,
         };
         outSelector.outbounds.Insert(0, outUrltest.tag);
@@ -721,9 +761,9 @@ public partial class CoreConfigSingboxService
         return resultOutbounds;
     }
 
-    private static List<BaseServer4Sbox> CloneOutbounds(List<BaseServer4Sbox> source)
+    private List<BaseServer4Sbox> CloneOutbounds(List<BaseServer4Sbox> source)
     {
-        if (source is null || source.Count == 0)
+        if (source is not { Count: > 0 })
         {
             return [];
         }
@@ -740,9 +780,14 @@ public partial class CoreConfigSingboxService
             {
                 clone = JsonUtils.DeepCopy(endpoint);
             }
-            if (clone is not null)
+            if (clone is null)
             {
-                result.Add(clone);
+                continue;
+            }
+            result.Add(clone);
+            if (context.CustomOutboundMap.ContainsKey(item))
+            {
+                context.CustomOutboundMap[clone] = context.CustomOutboundMap[item];
             }
         }
         return result;

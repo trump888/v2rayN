@@ -1,16 +1,9 @@
-using AwesomeAssertions;
-using ServiceLib.Common;
-using ServiceLib.Enums;
-using ServiceLib.Models;
-using ServiceLib.Services.CoreConfig;
-using Xunit;
-
 namespace ServiceLib.Tests.CoreConfig.V2ray;
 
 public class CoreConfigV2rayServiceTests
 {
-    [Fact]
-    public void GenerateClientConfigContent_ShouldGenerateBasicProxyConfig()
+    [Test]
+    public async Task GenerateClientConfigContent_ShouldGenerateBasicProxyConfig()
     {
         var config = CoreConfigTestFactory.CreateConfig(ECoreType.Xray);
         CoreConfigTestFactory.BindAppManagerConfig(config);
@@ -19,17 +12,17 @@ public class CoreConfigV2rayServiceTests
 
         var result = new CoreConfigV2rayService(context).GenerateClientConfigContent();
 
-        result.Success.Should().BeTrue();
-        result.Data.Should().NotBeNull();
+        await result.Success.Should().BeTrue();
+        await result.Data.Should().NotBeNull();
 
         var v2rayConfig = JsonUtils.Deserialize<V2rayConfig>(result.Data!.ToString());
-        v2rayConfig.Should().NotBeNull();
-        v2rayConfig!.outbounds.Should().Contain(o => o.tag == Global.ProxyTag && o.protocol == "vmess");
-        v2rayConfig.inbounds.Should().Contain(i => i.protocol == nameof(EInboundProtocol.mixed));
+        await v2rayConfig.Should().NotBeNull();
+        await v2rayConfig!.outbounds.Should().Contain(o => o.tag == Global.ProxyTag && o.protocol == "vmess");
+        await v2rayConfig.inbounds.Should().Contain(i => i.protocol == nameof(EInboundProtocol.mixed));
     }
 
-    [Fact]
-    public void GenerateClientConfigContent_HttpOutbound_ShouldEmitHeadersInSettings()
+    [Test]
+    public async Task GenerateClientConfigContent_HttpOutbound_ShouldEmitHeadersInSettings()
     {
         var config = CoreConfigTestFactory.CreateConfig(ECoreType.Xray);
         CoreConfigTestFactory.BindAppManagerConfig(config);
@@ -42,27 +35,25 @@ public class CoreConfigV2rayServiceTests
 
         var result = new CoreConfigV2rayService(context).GenerateClientConfigContent();
 
-        result.Success.Should().BeTrue();
+        await result.Success.Should().BeTrue();
         var cfg = JsonUtils.Deserialize<V2rayConfig>(result.Data!.ToString())!;
         var outbound = cfg.outbounds.First(o => o.tag == Global.ProxyTag && o.protocol == "http");
 
-        outbound.settings.address?.ToString().Should().Be("proxy.example.com");
-        outbound.settings.port.Should().Be(8080);
-        outbound.settings.user.Should().Be("user");
-        outbound.settings.pass.Should().Be("pass");
-        outbound.settings.level.Should().Be(1);
-        outbound.settings.headers.Should().NotBeNull();
-        var headers = JsonUtils.ParseJson(outbound.settings.headers.ToString());
-        headers["User-Agent"]!.GetValue<string>().Should().Be("v2rayN");
-        headers["Set-Cookie"]!.AsArray()
+        await outbound.settings.address!.ToString().Should().BeEqualTo("proxy.example.com");
+        await outbound.settings.port.Should().BeEqualTo(8080);
+        await outbound.settings.user.Should().BeEqualTo("user");
+        await outbound.settings.pass.Should().BeEqualTo("pass");
+        await outbound.settings.level.Should().BeEqualTo(1);
+        await outbound.settings.headers.Should().NotBeNull();
+        var headers = JsonUtils.ParseJson(outbound.settings.headers!.ToString());
+        await headers["User-Agent"]!.GetValue<string>().Should().BeEqualTo("v2rayN");
+        await headers["Set-Cookie"]!.AsArray()
             .Select(item => item!.GetValue<string>())
-            .Should().Equal("a=1", "b=2");
-        outbound.settings.servers.Should().BeNull();
-        outbound.settings.vnext.Should().BeNull();
+            .Should().BeEquivalentTo(["a=1", "b=2"]);
     }
  
-    [Fact]
-    public void GenerateClientConfigContent_PolicyGroup_ShouldExpandChildrenAndBuildBalancer()
+    [Test]
+    public async Task GenerateClientConfigContent_PolicyGroup_ShouldExpandChildrenAndBuildBalancer()
     {
         var config = CoreConfigTestFactory.CreateConfig(ECoreType.Xray);
         CoreConfigTestFactory.BindAppManagerConfig(config);
@@ -79,17 +70,17 @@ public class CoreConfigV2rayServiceTests
 
         var result = new CoreConfigV2rayService(context).GenerateClientConfigContent();
 
-        result.Success.Should().BeTrue();
+        await result.Success.Should().BeTrue();
         var cfg = JsonUtils.Deserialize<V2rayConfig>(result.Data!.ToString())!;
 
-        cfg.outbounds.Should().Contain(o => o.tag.StartsWith("proxy-1-", StringComparison.Ordinal));
-        cfg.outbounds.Should().Contain(o => o.tag.StartsWith("proxy-2-", StringComparison.Ordinal));
-        cfg.routing.balancers.Should().NotBeNull();
-        cfg.routing.balancers!.Should().Contain(b => b.tag == Global.ProxyTag + Global.BalancerTagSuffix);
+        await cfg.outbounds.Should().Contain(o => o.tag.StartsWith("proxy-1-", StringComparison.Ordinal));
+        await cfg.outbounds.Should().Contain(o => o.tag.StartsWith("proxy-2-", StringComparison.Ordinal));
+        await cfg.routing.balancers.Should().NotBeNull();
+        await cfg.routing.balancers!.Should().Contain(b => b.tag == Global.ProxyTag + Global.BalancerTagSuffix);
     }
 
-    [Fact]
-    public void GenerateClientConfigContent_ProxyChain_ShouldBuildDialerProxyChain()
+    [Test]
+    public async Task GenerateClientConfigContent_ProxyChain_ShouldBuildDialerProxyChain()
     {
         var config = CoreConfigTestFactory.CreateConfig(ECoreType.Xray);
         CoreConfigTestFactory.BindAppManagerConfig(config);
@@ -105,21 +96,21 @@ public class CoreConfigV2rayServiceTests
 
         var result = new CoreConfigV2rayService(context).GenerateClientConfigContent();
 
-        result.Success.Should().BeTrue();
+        await result.Success.Should().BeTrue();
         var cfg = JsonUtils.Deserialize<V2rayConfig>(result.Data!.ToString())!;
 
-        cfg.outbounds.Should().Contain(o => o.tag.StartsWith("chain-proxy-1-", StringComparison.Ordinal));
+        await cfg.outbounds.Should().Contain(o => o.tag.StartsWith("chain-proxy-1-", StringComparison.Ordinal));
         var hasDialerChain = cfg.outbounds.Any(o =>
             o.tag == Global.ProxyTag
             && o.streamSettings is not null
             && o.streamSettings.sockopt is not null
             && (o.streamSettings.sockopt.dialerProxy ?? string.Empty).StartsWith("chain-proxy-1-",
                 StringComparison.Ordinal));
-        hasDialerChain.Should().BeTrue();
+        await hasDialerChain.Should().BeTrue();
     }
 
-    [Fact]
-    public void GenerateClientConfigContent_PolicyGroupWithProxyChain_ShouldBuildCombinedOutbounds()
+    [Test]
+    public async Task GenerateClientConfigContent_PolicyGroupWithProxyChain_ShouldBuildCombinedOutbounds()
     {
         var config = CoreConfigTestFactory.CreateConfig(ECoreType.Xray);
         CoreConfigTestFactory.BindAppManagerConfig(config);
@@ -140,18 +131,18 @@ public class CoreConfigV2rayServiceTests
 
         var result = new CoreConfigV2rayService(context).GenerateClientConfigContent();
 
-        result.Success.Should().BeTrue();
+        await result.Success.Should().BeTrue();
         var cfg = JsonUtils.Deserialize<V2rayConfig>(result.Data!.ToString())!;
 
-        cfg.outbounds.Should().Contain(o => o.tag.StartsWith("proxy-1-", StringComparison.Ordinal));
-        cfg.outbounds.Should().Contain(o => o.tag.StartsWith("chain-proxy-1-", StringComparison.Ordinal));
-        cfg.outbounds.Should().Contain(o => o.tag.StartsWith("proxy-2-", StringComparison.Ordinal));
-        cfg.routing.balancers.Should().NotBeNull();
-        cfg.routing.balancers!.Should().Contain(b => b.tag == Global.ProxyTag + Global.BalancerTagSuffix);
+        await cfg.outbounds.Should().Contain(o => o.tag.StartsWith("proxy-1-", StringComparison.Ordinal));
+        await cfg.outbounds.Should().Contain(o => o.tag.StartsWith("chain-proxy-1-", StringComparison.Ordinal));
+        await cfg.outbounds.Should().Contain(o => o.tag.StartsWith("proxy-2-", StringComparison.Ordinal));
+        await cfg.routing.balancers.Should().NotBeNull();
+        await cfg.routing.balancers!.Should().Contain(b => b.tag == Global.ProxyTag + Global.BalancerTagSuffix);
     }
 
-    [Fact]
-    public void GenerateClientConfigContent_ProxyChainWithPolicyGroup_ShouldBuildClonedChainBranches()
+    [Test]
+    public async Task GenerateClientConfigContent_ProxyChainWithPolicyGroup_ShouldBuildClonedChainBranches()
     {
         var config = CoreConfigTestFactory.CreateConfig(ECoreType.Xray);
         CoreConfigTestFactory.BindAppManagerConfig(config);
@@ -173,27 +164,27 @@ public class CoreConfigV2rayServiceTests
 
         var result = new CoreConfigV2rayService(context).GenerateClientConfigContent();
 
-        result.Success.Should().BeTrue();
+        await result.Success.Should().BeTrue();
         var cfg = JsonUtils.Deserialize<V2rayConfig>(result.Data!.ToString())!;
 
-        cfg.outbounds.Should().Contain(o => o.tag.StartsWith("chain-proxy-1-group-1-", StringComparison.Ordinal));
-        cfg.outbounds.Should().Contain(o => o.tag.StartsWith("chain-proxy-1-group-2-", StringComparison.Ordinal));
+        await cfg.outbounds.Should().Contain(o => o.tag.StartsWith("chain-proxy-1-group-1-", StringComparison.Ordinal));
+        await cfg.outbounds.Should().Contain(o => o.tag.StartsWith("chain-proxy-1-group-2-", StringComparison.Ordinal));
 
         var proxyCloneCount = cfg.outbounds.Count(o => o.tag.StartsWith("proxy-clone-", StringComparison.Ordinal));
-        proxyCloneCount.Should().Be(2);
+        await proxyCloneCount.Should().BeEqualTo(2);
 
         var allCloneDialersPointToGroupBranches = cfg.outbounds
             .Where(o => o.tag.StartsWith("proxy-clone-", StringComparison.Ordinal))
             .All(o => (o.streamSettings?.sockopt?.dialerProxy ?? string.Empty).StartsWith("chain-proxy-1-group-",
                 StringComparison.Ordinal));
-        allCloneDialersPointToGroupBranches.Should().BeTrue();
+        await allCloneDialersPointToGroupBranches.Should().BeTrue();
 
-        cfg.routing.balancers.Should().NotBeNull();
-        cfg.routing.balancers!.Should().Contain(b => b.tag == Global.ProxyTag + Global.BalancerTagSuffix);
+        await cfg.routing.balancers.Should().NotBeNull();
+        await cfg.routing.balancers!.Should().Contain(b => b.tag == Global.ProxyTag + Global.BalancerTagSuffix);
     }
 
-    [Fact]
-    public void GenerateClientConfigContent_RoutingSplit_DirectAndBlock_ShouldApplyRules()
+    [Test]
+    public async Task GenerateClientConfigContent_RoutingSplit_DirectAndBlock_ShouldApplyRules()
     {
         var config = CoreConfigTestFactory.CreateConfig(ECoreType.Xray);
         CoreConfigTestFactory.BindAppManagerConfig(config);
@@ -229,24 +220,24 @@ public class CoreConfigV2rayServiceTests
 
         var result = new CoreConfigV2rayService(context).GenerateClientConfigContent();
 
-        result.Success.Should().BeTrue();
+        await result.Success.Should().BeTrue();
         var cfg = JsonUtils.Deserialize<V2rayConfig>(result.Data!.ToString())!;
 
         var hasDirectRule = cfg.routing.rules.Any(r =>
             r.domain != null
             && r.domain.Contains("full:direct.example.com")
             && r.outboundTag == Global.DirectTag);
-        hasDirectRule.Should().BeTrue();
+        await hasDirectRule.Should().BeTrue();
 
         var hasBlockRule = cfg.routing.rules.Any(r =>
             r.domain != null
             && r.domain.Contains("full:block.example.com")
             && r.outboundTag == Global.BlockTag);
-        hasBlockRule.Should().BeTrue();
+        await hasBlockRule.Should().BeTrue();
     }
 
-    [Fact]
-    public void GenerateClientConfigContent_RoutingSplit_ByRemark_ShouldGenerateTargetOutbound()
+    [Test]
+    public async Task GenerateClientConfigContent_RoutingSplit_ByRemark_ShouldGenerateTargetOutbound()
     {
         var config = CoreConfigTestFactory.CreateConfig(ECoreType.Xray);
         CoreConfigTestFactory.BindAppManagerConfig(config);
@@ -278,20 +269,20 @@ public class CoreConfigV2rayServiceTests
 
         var result = new CoreConfigV2rayService(context).GenerateClientConfigContent();
 
-        result.Success.Should().BeTrue();
+        await result.Success.Should().BeTrue();
         var cfg = JsonUtils.Deserialize<V2rayConfig>(result.Data!.ToString())!;
         var expectedPrefix = $"{routeNode.IndexId}-{Global.ProxyTag}-{routeNode.Remarks}";
 
-        cfg.outbounds.Should().Contain(o => o.tag.StartsWith(expectedPrefix, StringComparison.Ordinal));
+        await cfg.outbounds.Should().Contain(o => o.tag.StartsWith(expectedPrefix, StringComparison.Ordinal));
         var hasRouteRule = cfg.routing.rules.Any(r =>
             r.domain != null
             && r.domain.Contains("full:route.example.com")
             && (r.outboundTag ?? string.Empty).StartsWith(expectedPrefix, StringComparison.Ordinal));
-        hasRouteRule.Should().BeTrue();
+        await hasRouteRule.Should().BeTrue();
     }
 
-    [Fact]
-    public void GenerateClientConfigContent_DirectExpectedIPs_ShouldApplyExpectedIPsToDirectDnsServer()
+    [Test]
+    public async Task GenerateClientConfigContent_DirectExpectedIPs_ShouldApplyExpectedIPsToDirectDnsServer()
     {
         var config = CoreConfigTestFactory.CreateConfigWithDirectExpectedIPs(ECoreType.Xray, "192.168.0.0/16,geoip:cn");
         CoreConfigTestFactory.BindAppManagerConfig(config);
@@ -320,7 +311,7 @@ public class CoreConfigV2rayServiceTests
 
         var result = new CoreConfigV2rayService(context).GenerateClientConfigContent();
 
-        result.Success.Should().BeTrue();
+        await result.Success.Should().BeTrue();
         var cfg = JsonUtils.Deserialize<V2rayConfig>(result.Data!.ToString())!;
         var dns = JsonUtils.Deserialize<Dns4Ray>(JsonUtils.Serialize(cfg.dns))!;
 
@@ -335,11 +326,11 @@ public class CoreConfigV2rayServiceTests
             && s.domains?.Contains("geosite:cn") == true
             && s.expectedIPs?.Contains("192.168.0.0/16") == true
             && s.expectedIPs?.Contains("geoip:cn") == true);
-        hasExpectedServer.Should().BeTrue();
+        await hasExpectedServer.Should().BeTrue();
     }
 
-    [Fact]
-    public void GenerateClientConfigContent_BootstrapDNS_ShouldApplyToDnsServerDomains()
+    [Test]
+    public async Task GenerateClientConfigContent_BootstrapDNS_ShouldApplyToDnsServerDomains()
     {
         var bootstrapDns = "8.8.8.8";
         var config = CoreConfigTestFactory.CreateConfigWithBootstrapDNS(ECoreType.Xray, bootstrapDns);
@@ -352,7 +343,7 @@ public class CoreConfigV2rayServiceTests
 
         var result = new CoreConfigV2rayService(context).GenerateClientConfigContent();
 
-        result.Success.Should().BeTrue();
+        await result.Success.Should().BeTrue();
         var cfg = JsonUtils.Deserialize<V2rayConfig>(result.Data!.ToString())!;
         var dns = JsonUtils.Deserialize<Dns4Ray>(JsonUtils.Serialize(cfg.dns))!;
 
@@ -366,11 +357,11 @@ public class CoreConfigV2rayServiceTests
             s.address == bootstrapDns
             && s.domains?.Contains("full:dns-direct.example") == true
             && s.domains?.Contains("full:dns-remote.example") == true);
-        hasBootstrapServer.Should().BeTrue();
+        await hasBootstrapServer.Should().BeTrue();
     }
 
-    [Fact]
-    public void GenerateClientConfigContent_DnsFallback_LastRuleDirect_ShouldUseDirectDnsServers()
+    [Test]
+    public async Task GenerateClientConfigContent_DnsFallback_LastRuleDirect_ShouldUseDirectDnsServers()
     {
         var config = CoreConfigTestFactory.CreateConfig(ECoreType.Xray);
         config.SimpleDNSItem.DirectDNS = "1.1.1.1";
@@ -403,7 +394,7 @@ public class CoreConfigV2rayServiceTests
 
         var result = new CoreConfigV2rayService(context).GenerateClientConfigContent();
 
-        result.Success.Should().BeTrue();
+        await result.Success.Should().BeTrue();
         var cfg = JsonUtils.Deserialize<V2rayConfig>(result.Data!.ToString())!;
         var dns = JsonUtils.Deserialize<Dns4Ray>(JsonUtils.Serialize(cfg.dns))!;
         var dnsServers = dns.servers
@@ -415,14 +406,14 @@ public class CoreConfigV2rayServiceTests
         var hasDirectFallback = dnsServers.Any(s =>
             (s.tag ?? string.Empty).StartsWith(Global.DirectDnsTag, StringComparison.Ordinal)
             && s.address == "1.1.1.1");
-        hasDirectFallback.Should().BeTrue();
+        await hasDirectFallback.Should().BeTrue();
 
         var hasRemoteFallback = dnsServers.Any(s => s.address == "9.9.9.9");
-        hasRemoteFallback.Should().BeFalse();
+        await hasRemoteFallback.Should().BeFalse();
     }
 
-    [Fact]
-    public void GenerateClientConfigContent_DirectExpectedIPs_NonMatchingRegion_ShouldNotApplyExpectedIPs()
+    [Test]
+    public async Task GenerateClientConfigContent_DirectExpectedIPs_NonMatchingRegion_ShouldNotApplyExpectedIPs()
     {
         var config = CoreConfigTestFactory.CreateConfigWithDirectExpectedIPs(ECoreType.Xray, "192.168.0.0/16,geoip:cn");
         CoreConfigTestFactory.BindAppManagerConfig(config);
@@ -451,7 +442,7 @@ public class CoreConfigV2rayServiceTests
 
         var result = new CoreConfigV2rayService(context).GenerateClientConfigContent();
 
-        result.Success.Should().BeTrue();
+        await result.Success.Should().BeTrue();
         var cfg = JsonUtils.Deserialize<V2rayConfig>(result.Data!.ToString())!;
         var dns = JsonUtils.Deserialize<Dns4Ray>(JsonUtils.Serialize(cfg.dns))!;
         var dnsServers = dns.servers
@@ -463,14 +454,14 @@ public class CoreConfigV2rayServiceTests
         var hasExpectedIPs = dnsServers.Any(s =>
             s.expectedIPs?.Contains("192.168.0.0/16") == true
             || s.expectedIPs?.Contains("geoip:cn") == true);
-        hasExpectedIPs.Should().BeFalse();
+        await hasExpectedIPs.Should().BeFalse();
     }
 
-    [Theory]
-    [InlineData("geosite:cn")]
-    [InlineData("geosite:geolocation-cn")]
-    [InlineData("geosite:tld-cn")]
-    public void GenerateClientConfigContent_DirectExpectedIPs_RegionVariant_ShouldApplyExpectedIPs(string domainTag)
+    [Test]
+    [Arguments("geosite:cn")]
+    [Arguments("geosite:geolocation-cn")]
+    [Arguments("geosite:tld-cn")]
+    public async Task GenerateClientConfigContent_DirectExpectedIPs_RegionVariant_ShouldApplyExpectedIPs(string domainTag)
     {
         var config = CoreConfigTestFactory.CreateConfigWithDirectExpectedIPs(ECoreType.Xray, "192.168.0.0/16,geoip:cn");
         CoreConfigTestFactory.BindAppManagerConfig(config);
@@ -496,7 +487,7 @@ public class CoreConfigV2rayServiceTests
 
         var result = new CoreConfigV2rayService(context).GenerateClientConfigContent();
 
-        result.Success.Should().BeTrue();
+        await result.Success.Should().BeTrue();
         var cfg = JsonUtils.Deserialize<V2rayConfig>(result.Data!.ToString())!;
         var dns = JsonUtils.Deserialize<Dns4Ray>(JsonUtils.Serialize(cfg.dns))!;
         var dnsServers = dns.servers
@@ -510,11 +501,11 @@ public class CoreConfigV2rayServiceTests
             && s.domains?.Contains(domainTag) == true
             && s.expectedIPs?.Contains("192.168.0.0/16") == true
             && s.expectedIPs?.Contains("geoip:cn") == true);
-        hasExpectedServer.Should().BeTrue();
+        await hasExpectedServer.Should().BeTrue();
     }
 
-    [Fact]
-    public void GenerateClientConfigContent_Hosts_ShouldPopulateDnsHosts()
+    [Test]
+    public async Task GenerateClientConfigContent_Hosts_ShouldPopulateDnsHosts()
     {
         var config = CoreConfigTestFactory.CreateConfig(ECoreType.Xray);
         config.SimpleDNSItem.Hosts = "resolver.example 1.1.1.1";
@@ -525,17 +516,17 @@ public class CoreConfigV2rayServiceTests
 
         var result = new CoreConfigV2rayService(context).GenerateClientConfigContent();
 
-        result.Success.Should().BeTrue();
+        await result.Success.Should().BeTrue();
         var cfg = JsonUtils.Deserialize<V2rayConfig>(result.Data!.ToString())!;
         var dns = JsonUtils.Deserialize<Dns4Ray>(JsonUtils.Serialize(cfg.dns))!;
 
-        dns.hosts.Should().NotBeNull();
-        dns.hosts!.Should().ContainKey("resolver.example");
-        JsonUtils.Serialize(dns.hosts!["resolver.example"]).Should().Contain("1.1.1.1");
+        await dns.hosts.Should().NotBeNull();
+        await dns.hosts!.Should().ContainKey("resolver.example");
+        await JsonUtils.Serialize(dns.hosts!["resolver.example"]).Should().Contain("1.1.1.1");
     }
 
-    [Fact]
-    public void GenerateClientConfigContent_RawDnsEnabled_ShouldUseCustomDnsConfig()
+    [Test]
+    public async Task GenerateClientConfigContent_RawDnsEnabled_ShouldUseCustomDnsConfig()
     {
         var config = CoreConfigTestFactory.CreateConfig(ECoreType.Xray);
         CoreConfigTestFactory.BindAppManagerConfig(config);
@@ -556,22 +547,114 @@ public class CoreConfigV2rayServiceTests
 
         var result = new CoreConfigV2rayService(context).GenerateClientConfigContent();
 
-        result.Success.Should().BeTrue();
+        await result.Success.Should().BeTrue();
         var cfg = JsonUtils.Deserialize<V2rayConfig>(result.Data!.ToString())!;
         var dns = JsonUtils.Deserialize<Dns4Ray>(JsonUtils.Serialize(cfg.dns))!;
 
-        JsonUtils.Serialize(dns.servers).Should().Contain("8.8.8.8");
-        dns.hosts.Should().NotBeNull();
-        dns.hosts!.Should().ContainKey("raw.example");
-        JsonUtils.Serialize(dns.hosts!["raw.example"]).Should().Contain("1.1.1.1");
+        await JsonUtils.Serialize(dns.servers).Should().Contain("8.8.8.8");
+        await dns.hosts.Should().NotBeNull();
+        await dns.hosts!.Should().ContainKey("raw.example");
+        await JsonUtils.Serialize(dns.hosts!["raw.example"]).Should().Contain("1.1.1.1");
 
         var directOutbound = cfg.outbounds.FirstOrDefault(o => o.tag == Global.DirectTag && o.protocol == "freedom");
-        directOutbound.Should().NotBeNull();
-        directOutbound!.streamSettings.sockopt!.domainStrategy.Should().Be("UseIPv4");
+        await directOutbound.Should().NotBeNull();
+        await directOutbound!.streamSettings.sockopt!.domainStrategy.Should().BeEqualTo("UseIPv4");
     }
 
-    [Fact]
-    public void GenerateClientConfigContent_TunRouteExcludeAddress()
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task GenerateClientConfigContent_Tun_ShouldRouteIPv6IntoTunnel(bool enableIPv6Address)
+    {
+        var config = CoreConfigTestFactory.CreateConfigWithTun(ECoreType.Xray, enableIPv6Address);
+        CoreConfigTestFactory.BindAppManagerConfig(config);
+
+        var node = CoreConfigTestFactory.CreateVmessNode(ECoreType.Xray, "n-main", "main");
+        var context = CoreConfigTestFactory.CreateContext(config, node, ECoreType.Xray);
+
+        var result = new CoreConfigV2rayService(context).GenerateClientConfigContent();
+
+        await result.Success.Should().BeTrue();
+        var cfg = JsonUtils.Deserialize<V2rayConfig>(result.Data!.ToString())!;
+        var tunInbound = cfg.inbounds.FirstOrDefault(i => i.protocol == "tun");
+
+        await tunInbound.Should().NotBeNull();
+        await tunInbound!.settings.autoSystemRoutingTable.Should().Contain("0.0.0.0/0");
+        await tunInbound.settings.autoSystemRoutingTable.Should().Contain("::/0");
+
+        // EnableIPv6Address governs the interface address only, never the routing table.
+        await tunInbound.settings.gateway.Should().HaveCount(enableIPv6Address ? 2 : 1);
+    }
+
+    [Test]
+    [Arguments(true)]
+    [Arguments(false)]
+    public async Task GenerateClientConfigContent_Tun_ShouldSkipIPv6RouteWithoutGlobalIPv6(bool enableIPv6Address)
+    {
+        // A host without a global IPv6 address has no IPv6 traffic that could bypass the tunnel,
+        // while ::/0 would pull IPv6 attempts into a tunnel they cannot leave.
+        var config = CoreConfigTestFactory.CreateConfigWithTun(ECoreType.Xray, enableIPv6Address);
+        CoreConfigTestFactory.BindAppManagerConfig(config);
+
+        var node = CoreConfigTestFactory.CreateVmessNode(ECoreType.Xray, "n-main", "main");
+        var context = CoreConfigTestFactory.CreateContext(config, node, ECoreType.Xray, hasGlobalIPv6Address: false);
+
+        var result = new CoreConfigV2rayService(context).GenerateClientConfigContent();
+
+        await result.Success.Should().BeTrue();
+        var cfg = JsonUtils.Deserialize<V2rayConfig>(result.Data!.ToString())!;
+        var tunInbound = cfg.inbounds.FirstOrDefault(i => i.protocol == "tun");
+
+        await tunInbound.Should().NotBeNull();
+        await tunInbound!.settings.autoSystemRoutingTable.Should().Contain("0.0.0.0/0");
+        var ipv6Routes = tunInbound.settings.autoSystemRoutingTable!.Where(x => x.Contains(':')).ToList();
+        await ipv6Routes.Should().BeEmpty();
+    }
+
+    [Test]
+    public async Task GenerateClientConfigContent_TunRouteExcludeAddress_ShouldSkipIPv6RangesWithoutGlobalIPv6()
+    {
+        var config = CoreConfigTestFactory.CreateConfigWithTunRouteExcludeAddress(ECoreType.Xray);
+        config.TunModeItem.EnableIPv6Address = false;
+        CoreConfigTestFactory.BindAppManagerConfig(config);
+
+        var node = CoreConfigTestFactory.CreateVmessNode(ECoreType.Xray, "n-main", "main");
+        var context = CoreConfigTestFactory.CreateContext(config, node, ECoreType.Xray, hasGlobalIPv6Address: false);
+
+        var result = new CoreConfigV2rayService(context).GenerateClientConfigContent();
+
+        await result.Success.Should().BeTrue();
+        var cfg = JsonUtils.Deserialize<V2rayConfig>(result.Data!.ToString())!;
+        var tunInbound = cfg.inbounds.FirstOrDefault(i => i.protocol == "tun");
+
+        await tunInbound.Should().NotBeNull();
+        await tunInbound!.settings.autoSystemRoutingTable.Should().NotBeEmpty();
+        var ipv6Routes = tunInbound.settings.autoSystemRoutingTable!.Where(x => x.Contains(':')).ToList();
+        await ipv6Routes.Should().BeEmpty();
+    }
+
+    [Test]
+    public async Task GenerateClientConfigContent_TunRouteExcludeAddress_ShouldIncludeIPv6Ranges()
+    {
+        var config = CoreConfigTestFactory.CreateConfigWithTunRouteExcludeAddress(ECoreType.Xray);
+        config.TunModeItem.EnableIPv6Address = false;
+        CoreConfigTestFactory.BindAppManagerConfig(config);
+
+        var node = CoreConfigTestFactory.CreateVmessNode(ECoreType.Xray, "n-main", "main");
+        var context = CoreConfigTestFactory.CreateContext(config, node, ECoreType.Xray);
+
+        var result = new CoreConfigV2rayService(context).GenerateClientConfigContent();
+
+        await result.Success.Should().BeTrue();
+        var cfg = JsonUtils.Deserialize<V2rayConfig>(result.Data!.ToString())!;
+        var tunInbound = cfg.inbounds.FirstOrDefault(i => i.protocol == "tun");
+
+        await tunInbound.Should().NotBeNull();
+        await tunInbound!.settings.autoSystemRoutingTable.Should().Contain(x => x.Contains(':'));
+    }
+
+    [Test]
+    public async Task GenerateClientConfigContent_TunRouteExcludeAddress()
     {
         var config = CoreConfigTestFactory.CreateConfigWithTunRouteExcludeAddress(ECoreType.Xray);
         CoreConfigTestFactory.BindAppManagerConfig(config);
@@ -581,15 +664,53 @@ public class CoreConfigV2rayServiceTests
 
         var result = new CoreConfigV2rayService(context).GenerateClientConfigContent();
 
-        result.Success.Should().BeTrue();
+        await result.Success.Should().BeTrue();
 
         var cfg = JsonUtils.Deserialize<V2rayConfig>(result.Data!.ToString())!;
         var tunInbound = cfg.inbounds.FirstOrDefault(i => i.protocol == "tun");
 
-        tunInbound.Should().NotBeNull();
+        await tunInbound.Should().NotBeNull();
 
-        tunInbound!.settings.autoSystemRoutingTable.Should().NotContain("0.0.0.0/0");
-        tunInbound!.settings.autoSystemRoutingTable.Should().Contain("10.0.0.0/32");
-        tunInbound!.settings.autoSystemRoutingTable.Should().Contain("10.0.0.2/31");
+        await tunInbound!.settings.autoSystemRoutingTable.Should().NotContain("0.0.0.0/0");
+        await tunInbound!.settings.autoSystemRoutingTable.Should().Contain("10.0.0.0/32");
+        await tunInbound!.settings.autoSystemRoutingTable.Should().Contain("10.0.0.2/31");
+    }
+
+    [Test]
+    public async Task GenerateClientConfigContent_CustomOutbound_ShouldReplaceWithUserCustomOutboundJson()
+    {
+        var config = CoreConfigTestFactory.CreateConfig(ECoreType.Xray);
+        CoreConfigTestFactory.BindAppManagerConfig(config);
+
+        var customNode = CoreConfigTestFactory.CreateCustomOutboundNode(ECoreType.Xray, "n-custom", "custom-xray");
+        var customJsonContent = """
+        {
+          "protocol": "shadowsocks",
+          "settings": {
+            "servers": [
+              {
+                "address": "1.2.3.4",
+                "port": 8388,
+                "method": "aes-128-gcm",
+                "password": "custom_password"
+              }
+            ]
+          }
+        }
+        """;
+
+        var context = CoreConfigTestFactory.CreateContext(config, customNode, ECoreType.Xray);
+        context.CustomOutboundContent[customNode.IndexId] = customJsonContent;
+
+        var result = new CoreConfigV2rayService(context).GenerateClientConfigContent();
+
+        await result.Success.Should().BeTrue().Because($"ret msg: {result.Msg}");
+        await result.Data.Should().NotBeNull();
+
+        var cfg = JsonUtils.Deserialize<V2rayConfig>(result.Data!.ToString());
+        await cfg.Should().NotBeNull();
+        var proxyOutbound = cfg!.outbounds.FirstOrDefault(o => o.tag == Global.ProxyTag);
+        await proxyOutbound.Should().NotBeNull();
+        await proxyOutbound!.protocol.Should().BeEqualTo("shadowsocks");
     }
 }

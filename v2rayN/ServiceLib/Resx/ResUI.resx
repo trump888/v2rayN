@@ -142,7 +142,7 @@
     <value>Failed to get the default configuration</value>
   </data>
   <data name="FailedImportedCustomServer" xml:space="preserve">
-    <value>Failed to import custom configuration Configuration</value>
+    <value>Failed to import configuration</value>
   </data>
   <data name="FailedReadConfiguration" xml:space="preserve">
     <value>Failed to read configuration file</value>
@@ -283,7 +283,7 @@
     <value>Configuration successful. {0}</value>
   </data>
   <data name="SuccessfullyImportedCustomServer" xml:space="preserve">
-    <value>Custom configuration Configuration imported successfully</value>
+    <value>Custom configuration imported successfully</value>
   </data>
   <data name="SuccessfullyImportedServerViaClipboard" xml:space="preserve">
     <value>{0} Configurations have been imported from clipboard</value>
@@ -385,7 +385,7 @@
     <value>All</value>
   </data>
   <data name="FillServerAddressCustom" xml:space="preserve">
-    <value>Please browse to import Configuration configuration</value>
+    <value>Please browse to import configuration</value>
   </data>
   <data name="Speedtesting" xml:space="preserve">
     <value>Testing...</value>
@@ -398,6 +398,9 @@
   </data>
   <data name="MsgServerTitle" xml:space="preserve">
     <value>Filter, press Enter to execute</value>
+  </data>
+  <data name="menuCheckAndUpdate" xml:space="preserve">
+    <value>Check and Update</value>
   </data>
   <data name="menuCheckUpdate" xml:space="preserve">
     <value>Check Update</value>
@@ -692,6 +695,9 @@
   </data>
   <data name="TbSettingsEnableCheckPreReleaseUpdate" xml:space="preserve">
     <value>Check for pre-release</value>
+  </data>
+  <data name="TbSettingsEnableUpdateViaProxy" xml:space="preserve">
+    <value>Update via proxy</value>
   </data>
   <data name="TbSettingsException" xml:space="preserve">
     <value>Exception</value>
@@ -1020,6 +1026,15 @@
   <data name="TbSettingsMux4SboxProtocol" xml:space="preserve">
     <value>sing-box Mux Protocol</value>
   </data>
+  <data name="TbSettingsMux4RayConcurrency" xml:space="preserve">
+    <value>Xray Mux concurrency</value>
+  </data>
+  <data name="TbSettingsMux4RayXudpConcurrency" xml:space="preserve">
+    <value>Xray Mux XUDP concurrency</value>
+  </data>
+  <data name="TbSettingsMux4RayXudpProxyUDP443" xml:space="preserve">
+    <value>Xray Mux XUDP proxy UDP443</value>
+  </data>
   <data name="TbRoutingRuleProcess" xml:space="preserve">
     <value>Process (Linux/Windows)</value>
   </data>
@@ -1221,7 +1236,7 @@
   <data name="menuModeRule" xml:space="preserve">
     <value>Rule</value>
   </data>
-  <data name="menuProxiesDelaytest" xml:space="preserve">
+  <data name="menuDelaytest" xml:space="preserve">
     <value>Latency Test</value>
   </data>
   <data name="menuProxiesDelaytestPart" xml:space="preserve">
@@ -1462,7 +1477,7 @@
     <value>Custom DNS Enabled, This Page's Settings Invalid</value>
   </data>
   <data name="TbBlockSVCBHTTPSQueriesTips" xml:space="preserve">
-    <value>Block ECH and HTTP/3 availability checks when enabled</value>
+    <value>Block ECH and HTTP/3 availability checks when enabled. Always enabled in Xray</value>
   </data>
   <data name="FillCorrectConfigTemplateText" xml:space="preserve">
     <value>Please fill in the correct config template</value>
@@ -1771,7 +1786,7 @@ The "Get Certificate" action may fail if a self-signed certificate is used or if
     <value>Only Check</value>
   </data>
   <data name="MsgNotSupport" xml:space="preserve">
-    <value>Not Support</value>
+    <value>Not Supported</value>
   </data>
   <data name="LvTestIpInfo" xml:space="preserve">
     <value>IP Info</value>
@@ -1847,5 +1862,47 @@ The "Get Certificate" action may fail if a self-signed certificate is used or if
   </data>
   <data name="TbIpv4Address" xml:space="preserve">
     <value>Ipv4 Address</value>
+  </data>
+  <data name="menuAddCustomOutboundServer" xml:space="preserve">
+    <value>Add a custom outbound</value>
+  </data>
+  <data name="MsgCustomOutboundFileNotFound" xml:space="preserve">
+    <value>Custom outbound {0} file not found: {1}</value>
+  </data>
+  <data name="TbCustomOutboundTip" xml:space="preserve">
+    <value>Only single outbound/endpoint supported for xray/sing-box</value>
+  </data>
+  <data name="LvCustomCoreType" xml:space="preserve">
+    <value>Custom config core</value>
+  </data>
+  <data name="TbXrayOnly" xml:space="preserve">
+    <value>Xray Only</value>
+  </data>
+  <data name="TbBlockAAAAQueries" xml:space="preserve">
+    <value>Block AAAA Queries</value>
+  </data>
+  <data name="TbBlockAAAAQueriesTips" xml:space="preserve">
+    <value>Block IPv6 queries when enabled</value>
+  </data>
+  <data name="TbDNS" xml:space="preserve">
+    <value>DNS</value>
+  </data>
+  <data name="TbSettingsMux4Ray" xml:space="preserve">
+    <value>Xray Mux setting</value>
+  </data>
+  <data name="LvRequestHeaders" xml:space="preserve">
+    <value>HTTP headers (JSON)</value>
+  </data>
+  <data name="SubRequestHeadersTips" xml:space="preserve">
+    <value>Optional. Example: {"X-hwid": "my_device"}. Values override default headers for all URLs in this group, including the subscription conversion service.</value>
+  </data>
+  <data name="SubRequestHeadersInvalid" xml:space="preserve">
+    <value>Invalid HTTP headers. Use a JSON object with unique header names and string values. Header names and values must not contain line breaks.</value>
+  </data>
+  <data name="TbSortingProcess" xml:space="preserve">
+    <value>Process</value>
+  </data>
+  <data name="menuAddMasqueServer" xml:space="preserve">
+    <value>Add [MASQUE]</value>
   </data>
 </root>

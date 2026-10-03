@@ -26,6 +26,16 @@
                 Margin="{StaticResource Margin8}"
                 VerticalAlignment="Center"
                 Style="{StaticResource ToolbarTextBlock}"
+                Text="{x:Static resx:ResUI.TbSettingsEnableUpdateViaProxy}" />
+            <ToggleButton
+                x:Name="togEnableUpdateViaProxy"
+                Margin="{StaticResource Margin8}"
+                HorizontalAlignment="Left" />
+
+            <TextBlock
+                Margin="{StaticResource Margin8}"
+                VerticalAlignment="Center"
+                Style="{StaticResource ToolbarTextBlock}"
                 Text="{x:Static resx:ResUI.TbSettingsEnableCheckPreReleaseUpdate}" />
             <ToggleButton
                 x:Name="togEnableCheckPreReleaseUpdate"
@@ -43,7 +53,7 @@
                 x:Name="btnCheckUpdate"
                 Width="100"
                 Margin="{StaticResource Margin8}"
-                Content="{x:Static resx:ResUI.menuCheckUpdate}"
+                Content="{x:Static resx:ResUI.menuCheckAndUpdate}"
                 IsDefault="True"
                 Style="{StaticResource DefButton}" />
         </StackPanel>
