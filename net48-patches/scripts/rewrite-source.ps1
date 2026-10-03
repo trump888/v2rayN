@@ -13,6 +13,11 @@ param(
 $ErrorActionPreference = "Stop"
 $SourceDir = (Resolve-Path $SourceDir).Path
 
+# Constructs this script recognises but cannot rewrite automatically. Each entry
+# needs judgement to fix; the script reports them and exits non-zero so CI fails
+# loudly instead of emitting a silently broken build.
+$script:Unhandled = @()
+
 $csFiles = Get-ChildItem -Path $SourceDir -Recurse -Filter "*.cs" |
     Where-Object { $_.FullName -notmatch "\\(obj|bin)\\" -and
                    $_.FullName -notmatch "\.bak" -and
@@ -379,30 +384,13 @@ foreach ($f in $csFiles) {
         $content = $content -replace 'Chunk\(2\)\.Select\(c\s*=>\s*new string\(c\)\)', 'Chunk(2).Select(c => c)'
         $changed = $true
     }
-    # DownloaderHelper/DownloadService/ConnectionHandler: strip unsupported
-    # HttpClientHandler properties (statement form: anyVar.Prop = value;)
-    if ($f.Name -match 'DownloaderHelper|DownloadService|ConnectionHandler|HttpClientHelper') {
-        $stripProps = @('MaxConnectionsPerServer', 'PooledConnectionIdleTimeout', 'PooledConnectionLifetime',
-                        'EnableMultipleHttp2Connections', 'ConnectTimeout', 'Expect100ContinueTimeout',
-                        'KeepAlivePingTimeout', 'KeepAlivePingPolicy', 'SslOptions')
-        foreach ($prop in $stripProps) {
-            # Statement form: anyVar.Prop = value;
-            $content = $content -replace "(?m)^\s*\w+\.$prop\s*=\s*[^;]+;\s*$", "            /* net48: $prop */"
-            # anyVar.SslOptions.subProp = value;
-            $content = $content -replace "(?m)^\s*\w+\.SslOptions\.[^;]+;\s*$", "            /* net48: SslOptions */"
-            # Initializer form: Prop = value, -> delete line
-            $content = $content -replace "(?m)^\s*$prop\s*=\s*[^,\r\n]+,?\s*$", ""
-        }
-        $stripConfigProps = @('BlockTimeout', 'MaxTryAgainOnFailure', 'CustomHttpMessageHandlerFactory')
-        foreach ($prop in $stripConfigProps) {
-            $content = $content -replace "(?m)^\s*\w+\.$prop\s*=\s*[^;]+;\s*$", "            /* net48: $prop */"
-            $content = $content -replace "(?m)^\s*$prop\s*=\s*[^,\r\n]+,?\s*$", ""
-        }
-        # ConnectTimeout / KeepAliveTimeout in initializer form
-        $content = $content -replace "(?m)^\s*ConnectTimeout\s*=\s*[^,;\r\n]+,?\s*$", ""
-        $content = $content -replace "(?m)^\s*KeepAliveTimeout\s*=\s*[^,;\r\n]+,?\s*$", ""
-        $changed = $true
-    }
+    # NOTE: Downloader 3.1.2 / HttpClientHandler member stripping deliberately
+    # does NOT live here. It used to, but it (a) deleted MaxTryAgainOnFailure
+    # outright instead of renaming it to the 3.x spelling, silently losing
+    # download retries, and (b) used `[^;]+;` patterns that can span newlines
+    # and swallow the closing `};` of an object initializer. It is now handled
+    # once, in patch-targeted.ps1, with line-anchored patterns and a post-check
+    # that fails the run if a member could not be removed.
 
     # string.Join(char, IEnumerable<string>) — net48 only has Join(string, IEnumerable<string>)
     # Convert char literal to string literal: string.Join(',', ... -> string.Join(",", ...
@@ -674,5 +662,120 @@ if (Test-Path $simpleView) {
     }
 }
 
+# ---------------------------------------------------------------------------
+# Rewrite 20: [GeneratedRegex] source-generated regex -> cached static Regex
+# ---------------------------------------------------------------------------
+# .NET 7+ lets a partial Regex factory be stamped with [GeneratedRegex], and
+# Roslyn compiles the pattern into IL at build time. net48 has neither the
+# attribute nor the generator, so the partial method ends up with no
+# implementation part (CS8795).
+#
+# The attribute arguments are exactly the Regex constructor arguments after the
+# pattern, so `[GeneratedRegex(p, o)]` becomes `new Regex(p, o)`. We keep the
+# original factory method shape (returning a cached instance) so call sites such
+# as `SemVerRegex().Match(x)` are untouched.
+#
+# RegexOptions.Compiled is deliberately NOT added: GeneratedRegex emits
+# interpreted code, and forcing the regex compiler would add JIT cost and
+# memory on the resource-constrained Win7/Win10 targets this port targets.
+# ---------------------------------------------------------------------------
+foreach ($f in $csFiles) {
+    $content = Get-Content $f.FullName -Raw -Encoding UTF8
+    if ($content -notmatch '\[GeneratedRegex\(') { continue }
+
+    $pattern = '(?m)^(?<ind>[ \t]*)\[GeneratedRegex\((?<args>.*)\)\][ \t]*\r?\n' +
+               '(?<ind2>[ \t]*)(?<access>private|internal|public|protected)[ \t]+static[ \t]+partial[ \t]+Regex[ \t]+(?<name>\w+)[ \t]*\([ \t]*\)[ \t]*;'
+    $m = [regex]::Match($content, $pattern)
+    if (-not $m.Success) {
+        Write-Host "    ! $($f.Name): [GeneratedRegex] found but declaration shape unrecognised - needs a hand patch"
+        $script:Unhandled += "$($f.Name): unrecognised [GeneratedRegex] declaration"
+        continue
+    }
+
+    $argsText  = $m.Groups['args'].Value
+    $name      = $m.Groups['name'].Value
+    $ind       = $m.Groups['ind'].Value
+    $ind2      = $m.Groups['ind2'].Value
+    $access    = $m.Groups['access'].Value
+    $fieldName = "__${name}Instance"
+    $replacement = @(
+        "${ind}// NET48 PORT: was [GeneratedRegex] partial method (net7+ source-generated regex)."
+        "${ind}${access} static readonly Regex ${fieldName} = new Regex(${argsText});"
+        "${ind2}${access} static Regex ${name}() => ${fieldName};"
+    ) -join "`n"
+
+    $content = $content.Substring(0, $m.Index) + $replacement + $content.Substring($m.Index + $m.Length)
+    [System.IO.File]::WriteAllText($f.FullName, $content, [System.Text.UTF8Encoding]::new($false))
+    $rewriteCount++
+    Write-Host "    patched GeneratedRegex -> cached Regex: $($f.Name) ($name)"
+}
+
+# ---------------------------------------------------------------------------
+# Rewrite 21: non-extendable static hosts -> named polyfill class
+# ---------------------------------------------------------------------------
+# Parallel / Dns / Enum / DecompressionMethods are static classes or enums, so
+# the shims cannot hang extension methods off them. Redirect the call sites.
+# ---------------------------------------------------------------------------
+foreach ($f in $csFiles) {
+    $content = Get-Content $f.FullName -Raw -Encoding UTF8
+    $changed = $false
+
+    if ($content -match 'Parallel\.ForEachAsync\b') {
+        $content = $content -replace 'Parallel\.ForEachAsync\b', 'ParallelPolyfills.ForEachAsync'
+        $changed = $true
+    }
+    # Dns.GetHostEntryAsync(host, cancellationToken) -> drop the token.
+    # net48's Dns has no cancellable overload; the token is checked by the
+    # caller before the call, so dropping it preserves behaviour.
+    $content = $content -replace 'Dns\.GetHostEntryAsync\(([^,()]+),\s*(?:cancellationToken|ct|token)\)', 'Dns.GetHostEntryAsync($1)'
+
+    foreach ($m in @('GetNames', 'GetName', 'GetFormat')) {
+        if ($content -match "Enum\.$m<") {
+            $content = $content -replace "Enum\.$m<", "EnumGenericPolyfills.$m<"
+            $changed = $true
+        }
+    }
+
+    # DecompressionMethods.All (.NET 6) does not exist as an enum member on
+    # net48; expand it to the two members it was defined as.
+    if ($content -match 'DecompressionMethods\.All') {
+        $content = $content -replace 'DecompressionMethods\.All', '(DecompressionMethods.GZip | DecompressionMethods.Deflate)'
+        $changed = $true
+    }
+
+    # HttpRequestHeaders.NonValidated / HttpContentHeaders.NonValidated (.NET 5)
+    # are properties on types we cannot extend. Read through the public
+    # accessor instead: on net48 there is no restricted-header validation, so
+    # the non-validated view and the normal view are the same object.
+    if ($content -match '\.NonValidated\b') {
+        $content = $content -replace '([\w\.]+)\.NonValidated\b', '$1'
+        $changed = $true
+    }
+
+    # Numeric span parsing (.NET 8). System.UInt64 is a value type in mscorlib,
+    # so `ulong.TryParse(span, out n)` cannot resolve to an extension method.
+    # Only rewrite the exact 2-argument span form; string overloads keep working
+    # through the real BCL method.
+    $content = $content -replace 'ulong\.TryParse\(\s*(\w+)\s*,\s*out\s+(?:var|ulong)?\s*(\w+)\s*\)', 'SpanCharNet8Polyfills.TryParseUInt64($1, out var $2)'
+    $content = $content -replace 'long\.TryParse\(\s*(\w+)\s*,\s*out\s+(?:var|long)?\s*(\w+)\s*\)', 'SpanCharNet8Polyfills.TryParseInt64($1, out var $2)'
+    if ($content -match 'SpanCharNet8Polyfills\.TryParse') { $changed = $true }
+
+    if ($changed) {
+        [System.IO.File]::WriteAllText($f.FullName, $content, [System.Text.UTF8Encoding]::new($false))
+        $rewriteCount++
+        Write-Host "    patched static-host redirect: $($f.Name)"
+    }
+}
+
 Write-Host "  Total rewrites: $rewriteCount files touched"
+
+if ($script:Unhandled.Count -gt 0) {
+    Write-Host ""
+    Write-Host "  UNHANDLED net48 incompatibilities (need a manual patch):" -ForegroundColor Yellow
+    foreach ($u in $script:Unhandled) {
+        Write-Host "    - $u" -ForegroundColor Yellow
+    }
+    exit 1
+}
+
 exit 0

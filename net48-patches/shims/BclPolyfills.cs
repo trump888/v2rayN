@@ -63,7 +63,9 @@ namespace System
         public override int GetHashCode() => _value;
         public override string ToString() => IsFromEnd ? "^" + Value : Value.ToString();
         public static Index Start => new Index(0);
-        public static Index End => new Index(~0);
+        // Must go through the (value, fromEnd) ctor: `new Index(~0)` would hit
+        // the negative-value guard in the single-argument ctor.
+        public static Index End => new Index(0, fromEnd: true);
         public static Index FromStart(int value) => new Index(value);
         public static Index FromEnd(int value) => new Index(value, fromEnd: true);
         public static implicit operator Index(int value) => FromStart(value);

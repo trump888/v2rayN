@@ -95,33 +95,11 @@ namespace System.Diagnostics.CodeAnalysis
     [AttributeUsage(AttributeTargets.All, AllowMultiple = false, Inherited = false)]
     internal sealed class SetsRequiredMembersAttribute : Attribute { }
 
-    /// <summary>net48 polyfill: exists in System.Runtime but only since
-    /// .NET Standard 2.1. We re-declare to be safe for older TFMs.</summary>
-    [AttributeUsage(AttributeTargets.Parameter, AllowMultiple = false, Inherited = false)]
-    internal sealed class NotNullWhenAttribute : Attribute
-    {
-        public NotNullWhenAttribute(bool returnValue) { }
-    }
-
-    [AttributeUsage(AttributeTargets.Parameter, AllowMultiple = false, Inherited = false)]
-    internal sealed class MaybeNullWhenAttribute : Attribute
-    {
-        public MaybeNullWhenAttribute(bool returnValue) { }
-    }
-
-    [AttributeUsage(AttributeTargets.Property
-                  | AttributeTargets.Field
-                  | AttributeTargets.Parameter
-                  | AttributeTargets.ReturnValue,
-        AllowMultiple = true, Inherited = false)]
-    internal sealed class NotNullAttribute : Attribute { }
-
-    [AttributeUsage(AttributeTargets.Property
-                  | AttributeTargets.Field
-                  | AttributeTargets.Parameter
-                  | AttributeTargets.ReturnValue,
-        AllowMultiple = true, Inherited = false)]
-    internal sealed class MaybeNullAttribute : Attribute { }
+    // The nullable-flow attributes (NotNullWhen, MaybeNullWhen, NotNull,
+    // MaybeNull, MemberNotNull, ...) used to be declared here as `internal`.
+    // They now live in CodeAnalysisNullability.cs as `public`, because the
+    // ReactiveUI.SourceGenerators output applies them from generated code and
+    // could not see an internal type (CS0122).
 }
 
 namespace System.Runtime.CompilerServices

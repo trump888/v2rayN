@@ -1,7 +1,7 @@
 name: build net48 (Win7/Win10 lightweight)
 
 # =============================================================================
-# Build v2rayN 7.24.4 as a .NET Framework 4.8 WPF application.
+# Build the latest v2rayN as a .NET Framework 4.8 WPF application.
 #
 # Runs on windows-latest (free for public repos). Produces a framework-dependent
 # zip that runs on Win7 SP1 / Win10 / Win11 (target machine must have
@@ -24,7 +24,7 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: 'Tag to publish as (e.g. 7.24.4-net48). Leave empty for build-only.'
+        description: 'Tag to publish as (e.g. 7.25.4-net48). Leave empty for build-only.'
         required: false
         type: string
       use_release_source:
@@ -33,10 +33,10 @@ on:
         type: boolean
         default: true
       release_version:
-        description: 'Upstream release tag to build from (e.g. 7.24.4)'
+        description: 'Pin a specific upstream tag. Leave empty to use the latest release.'
         required: false
         type: string
-        default: '7.24.4'
+        default: ''
   schedule:
     - cron: '0 2 * * *'   # nightly at 02:00 UTC
 
@@ -56,12 +56,13 @@ jobs:
       # =====================================================================
       # Two-step checkout:
       #   1. Checkout fork HEAD to get net48-patches/ and .github/workflows/
-      #   2. Checkout upstream release tag (e.g. 7.24.4) on top of v2rayN/
-      #      folder to get a known-stable source.
+      #   2. Checkout the upstream source (release tag or master) into
+      #      v2rayN-src, then move its v2rayN/ folder into place.
       #
-      # Why: master branch may use newer APIs (ReactiveUI 24.x, ReactiveUI.
-      # Primitives, ReactiveUI.SourceGenerators) that our patches haven't
-      # been updated for. The release tag is a known-good baseline.
+      # The port tracks the same package versions as upstream (ReactiveUI 24.x
+      # via its net481 asset, MaterialDesignThemes 5.3.2 via net462, ...), so new
+      # upstream releases normally need no port changes at all. Only Downloader
+      # stays pinned older, because 3.2.0+ dropped every net48-consumable asset.
       # =====================================================================
 
       - name: Checkout fork HEAD (for net48-patches/)
@@ -71,13 +72,39 @@ jobs:
           submodules: recursive
           path: fork-head
 
-      - name: Checkout upstream release tag (for v2rayN source)
+      - name: Resolve upstream ref
+        id: upstream
+        shell: pwsh
+        run: |
+          $useRelease = '${{ inputs.use_release_source }}' -ne 'false'
+          $pinned = '${{ inputs.release_version }}'
+
+          if (-not $useRelease) {
+            $ref = 'master'
+            Write-Host "Building from upstream master (bleeding edge)"
+          }
+          elseif ($pinned) {
+            $ref = $pinned
+            Write-Host "Building from pinned upstream tag $ref"
+          }
+          else {
+            # No pin: take the newest published release, so upstream bug fixes
+            # and features are picked up without editing this workflow.
+            $latest = Invoke-RestMethod 'https://api.github.com/repos/2dust/v2rayN/releases/latest'
+            $ref = $latest.tag_name
+            Write-Host "Resolved latest upstream release: $ref"
+          }
+
+          "ref=$ref" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "version=$ref" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: Checkout upstream source
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           submodules: recursive
           repository: 2dust/v2rayN
-          ref: ${{ inputs.release_version || '7.24.4' }}
+          ref: ${{ steps.upstream.outputs.ref }}
           path: v2rayN-src
 
       - name: Move patches into place
@@ -158,6 +185,78 @@ jobs:
             Write-Error "Build failed"
             exit 1
           }
+
+      # =====================================================================
+      # Runtime-asset gate.
+      #
+      # This build compiles without RuntimeIdentifier too, so a missing RID -
+      # or a package that stops shipping natives - produces a clean compile and
+      # an app that dies before showing a window. Repobot.SQLite.Unofficial
+      # ships no buildTransitive targets, so without a RuntimeIdentifier the
+      # SDK never copies its runtimes/win-x64/native/e_sqlite3.dll into the
+      # output. SqliteHelper's constructor then throws DllNotFoundException on
+      # the first CreateTable call, which App.OnStartup makes before
+      # Show(); App.xaml.cs swallows DispatcherUnhandledException and
+      # ShutdownMode is OnExplicitShutdown, so the only symptom is a running
+      # process with no window and no error dialog.
+      #
+      # Assert the publish output is actually runnable here instead.
+      # =====================================================================
+      - name: Verify publish output is runnable
+        shell: pwsh
+        run: |
+          $binDir = "./v2rayN/v2rayN/bin/Release/net48"
+          if (-not (Test-Path $binDir)) { Write-Error "build output not found: $binDir"; exit 1 }
+
+          $required = @(
+            'v2rayN.exe',
+            'ServiceLib.dll',
+            'ReactiveUI.dll',
+            'ReactiveUI.Wpf.dll',
+            'ReactiveUI.Primitives.dll',
+            'MaterialDesignThemes.Wpf.dll',
+            'SQLitePCLRaw.core.dll',
+            'SQLitePCLRaw.provider.e_sqlite3.dll',
+            'e_sqlite3.dll',
+            'System.Text.Json.dll',
+            'System.Memory.dll'
+          )
+
+          # NuGet emits FodyWeavers / Fody output for the old ReactiveUI.Fody
+          # package; its presence means the port regressed to ReactiveUI 19.x.
+          $forbidden = @('FodyWeavers.exe', 'ReactiveUI.Fody.dll')
+
+          $missing = $required   | Where-Object { -not (Test-Path (Join-Path $binDir $_)) }
+          $present = $forbidden | Where-Object { Test-Path (Join-Path $binDir $_) }
+
+          if ($missing) {
+            Write-Error "publish output missing required runtime files: $($missing -join ', ')"
+            Write-Host "Contents of $binDir :"
+            Get-ChildItem $binDir | Select-Object -ExpandProperty Name
+            exit 1
+          }
+          if ($present) {
+            Write-Error "publish output contains removed ReactiveUI.Fody artifacts: $($present -join ', ')"
+            exit 1
+          }
+
+          # Sanity-check that the generated binding redirects actually made it
+          # into v2rayN.exe.config; .NET Framework cannot resolve
+          # System.Memory/System.Buffers without them.
+          $cfg = Join-Path $binDir 'v2rayN.exe.config'
+          if (-not (Test-Path $cfg)) {
+            Write-Error "v2rayN.exe.config is missing (no binding redirects on .NET Framework)"
+            exit 1
+          }
+          $cfgText = Get-Content $cfg -Raw
+          foreach ($asm in @('System.Memory', 'System.Buffers', 'System.Text.Json')) {
+            if ($cfgText -notmatch [regex]::Escape($asm)) {
+              Write-Error "v2rayN.exe.config has no binding redirect for $asm"
+              exit 1
+            }
+          }
+
+          Write-Host "publish output verified: $($required.Count) required files present, binding redirects OK"
 
       - name: Collect build outputs
         shell: pwsh
@@ -258,7 +357,7 @@ jobs:
       - name: Zip artifact
         shell: pwsh
         run: |
-          $ver = "${{ inputs.release_version || 'master' }}"
+          $ver = "${{ steps.upstream.outputs.version }}"
           if ($ver -eq "") { $ver = "master" }
           $zipName = "v2rayN-windows-net48-x64.zip"
           Compress-Archive -Path "publish-net48/*" -DestinationPath $zipName -Force
@@ -291,7 +390,7 @@ jobs:
           $notes = @"
           # v2rayN $tag (.NET Framework 4.8 port)
 
-          Built from upstream ${{ inputs.release_version || 'master' }}.
+          Built from upstream ${{ steps.upstream.outputs.version }}.
 
           ## System Requirements
 
@@ -310,7 +409,7 @@ jobs:
           - Self-contained: NO (requires .NET Framework 4.8 on target machine)
           - Single-file: NO (folder with multiple DLLs)
           - UDP test feature: stubbed out (returns -1)
-          - Tar extraction: not supported
+          - Tar extraction: uses ``tar.exe`` (present on Win10 1709+ / Win11)
           - CertificateChainPolicy: ignored (uses system trust store)
 
           See ``build-info.txt`` for full build metadata.

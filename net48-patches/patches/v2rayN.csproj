@@ -15,8 +15,13 @@
         <ItemGroup>
                 <PackageReference Include="MaterialDesignThemes" />
                 <PackageReference Include="H.NotifyIcon.Wpf" />
-                <PackageReference Include="ReactiveUI.Fody">
-                        <TreatAsUsed>true</TreatAsUsed>
+                <!-- NET48 PORT: same source generator upstream uses. ReactiveUI 24.x
+                     replaced the Fody [Reactive] weaver with partial-property source
+                     generation, so the port follows upstream instead of keeping
+                     ReactiveUI.Fody (which cannot see ReactiveUI.Primitives). -->
+                <PackageReference Include="ReactiveUI.SourceGenerators">
+                        <PrivateAssets>all</PrivateAssets>
+                        <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
                 </PackageReference>
                 <PackageReference Include="ReactiveUI.WPF" />
         </ItemGroup>

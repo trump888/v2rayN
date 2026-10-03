@@ -14,12 +14,38 @@
     <!-- =========================================================== -->
     <PropertyGroup>
         <TargetFramework>net48</TargetFramework>
-        <!-- C# 13 + preview features. C# 13 needed for partial properties
-             (ReactiveUI.Fody 19.x weaving). Preview needed for null-conditional
-             assignment (obj?.field = value) which is C# 14 preview. -->
+        <!-- C# 13 + preview features. Preview is required for two things the
+             port depends on:
+               - null-conditional assignment (obj?.field = value), C# 14 preview
+               - extension *properties*, which is how upstream's
+                 `span.IsEmpty` (no parentheses) binds to our shim
+             Partial properties come from ReactiveUI.SourceGenerators. -->
         <LangVersion>preview</LangVersion>
         <CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>
         <Nullable>annotations</Nullable>
+
+        <!-- ======================================================= -->
+        <!-- NET48 PORT: RuntimeIdentifier is REQUIRED, not cosmetic. -->
+        <!-- ======================================================= -->
+        <!-- SqliteHelper's constructor opens the DB on the very first
+             CreateTable call, which App.OnStartup does before the main
+             window is shown. The managed provider
+             (SQLitePCLRaw.provider.e_sqlite3.dll) P/Invokes into the
+             native e_sqlite3.dll, which comes from
+             Repobot.SQLite.Unofficial's runtimes/<rid>/native/ assets.
+             That package has NO buildTransitive targets to copy the
+             native, and for a .NET Framework build the SDK only copies
+             runtimes/ assets into the output when a RuntimeIdentifier is
+             set. Without it the publish output has no e_sqlite3.dll and
+             the app throws DllNotFoundException at startup; because
+             App.xaml.cs swallows DispatcherUnhandledException and
+             ShutdownMode is OnExplicitShutdown, the symptom is a
+             running process with no window.
+             AppendRuntimeIdentifierToOutputPath=false keeps the output
+             at bin/<cfg>/net48/ so CI paths do not change. -->
+        <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+        <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
+
         <!-- Original v2rayN uses `<ImplicitUsings>enable</ImplicitUsings>` in    -->
         <!-- net10. Their GlobalUsings.cs files only add a few extras on top of -->
         <!-- the SDK-default implicit usings (System, System.Collections.Generic, -->

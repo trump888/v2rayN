@@ -252,6 +252,59 @@ namespace System.Net.Http
         {
             return client.GetStringAsync(requestUri);
         }
+
+        // ------------------------------------------------------------------
+        // .NET 5 CancellationToken overloads. net48's System.Net.Http only
+        // ships the parameterless forms, so each polyfill forwards and drops
+        // the token. Callers on net48 keep the same cancellation semantics as
+        // upstream by checking the token before the call.
+        // ------------------------------------------------------------------
+        public static Task<Stream> GetStreamAsync(this HttpClient client, string requestUri, CancellationToken cancellationToken)
+        {
+            return client.GetStreamAsync(requestUri);
+        }
+        public static Task<Stream> GetStreamAsync(this HttpClient client, Uri requestUri, CancellationToken cancellationToken)
+        {
+            return client.GetStreamAsync(requestUri);
+        }
+        public static Task<byte[]> GetByteArrayAsync(this HttpClient client, string requestUri, CancellationToken cancellationToken)
+        {
+            return client.GetByteArrayAsync(requestUri);
+        }
+        public static Task<byte[]> GetByteArrayAsync(this HttpClient client, Uri requestUri, CancellationToken cancellationToken)
+        {
+            return client.GetByteArrayAsync(requestUri);
+        }
+        public static Task<HttpResponseMessage> GetAsync(this HttpClient client, string requestUri, HttpCompletionOption completionOption, CancellationToken cancellationToken)
+        {
+            return client.GetAsync(requestUri, completionOption);
+        }
+        public static Task<HttpResponseMessage> GetAsync(this HttpClient client, Uri requestUri, HttpCompletionOption completionOption, CancellationToken cancellationToken)
+        {
+            return client.GetAsync(requestUri, completionOption);
+        }
+        public static Task<HttpResponseMessage> SendAsync(this HttpClient client, HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            return client.SendAsync(request);
+        }
+        public static Task<HttpResponseMessage> SendAsync(this HttpClient client, HttpRequestMessage request, HttpCompletionOption completionOption, CancellationToken cancellationToken)
+        {
+            return client.SendAsync(request, completionOption);
+        }
+
+        // HttpContent read overloads that take a CancellationToken (.NET 5).
+        public static Task<string> ReadAsStringAsync(this HttpContent content, CancellationToken cancellationToken)
+        {
+            return content.ReadAsStringAsync();
+        }
+        public static Task<byte[]> ReadAsByteArrayAsync(this HttpContent content, CancellationToken cancellationToken)
+        {
+            return content.ReadAsByteArrayAsync();
+        }
+        public static Task<Stream> ReadAsStreamAsync(this HttpContent content, CancellationToken cancellationToken)
+        {
+            return content.ReadAsStreamAsync();
+        }
     }
 }
 
@@ -333,6 +386,19 @@ namespace System.Net.Sockets
         public static async Task ConnectAsync(this TcpClient client, IPAddress address, int port, CancellationToken cancellationToken)
         {
             await client.ConnectAsync(address, port);
+        }
+
+        // .NET 6 TcpListener.AcceptTcpClientAsync(CancellationToken) overload.
+        // .NET Framework 4.5 already ships the parameterless
+        // TcpListener.AcceptTcpClientAsync(), so this just forwards. (There is no
+        // equivalent on TcpClient in .NET Framework - not even the APM
+        // Begin/EndAcceptTcpClient pair - and v2rayN only accepts on a
+        // TcpListener, so no TcpClient shim is provided.)
+        public static Task<TcpClient> AcceptTcpClientAsync(this TcpListener listener, CancellationToken cancellationToken)
+        {
+            if (listener is null) throw new ArgumentNullException(nameof(listener));
+            cancellationToken.ThrowIfCancellationRequested();
+            return listener.AcceptTcpClientAsync();
         }
     }
 }

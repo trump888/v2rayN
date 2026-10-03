@@ -11,7 +11,14 @@
                 <PackageReference Include="ReactiveUI">
                         <TreatAsUsed>true</TreatAsUsed>
                 </PackageReference>
-                <PackageReference Include="ReactiveUI.Fody" />
+                <!-- NET48 PORT: same source generator upstream uses. ReactiveUI
+                     24.x dropped the Fody [Reactive] weaver for partial-property
+                     source generation, so we follow upstream instead of keeping
+                     the old ReactiveUI.Fody package. -->
+                <PackageReference Include="ReactiveUI.SourceGenerators">
+                        <PrivateAssets>all</PrivateAssets>
+                        <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+                </PackageReference>
                 <PackageReference Include="sqlite-net-e" />
                 <PackageReference Include="Repobot.SQLite.Unofficial" />
                 <PackageReference Include="NLog" />
