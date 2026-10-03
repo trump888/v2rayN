@@ -49,10 +49,20 @@ fi
 echo "=== [2/4] Apply net48 patches ==="
 pwsh -NoProfile -File "$PATCH_ROOT/scripts/apply-patches.ps1" -SourceDir "$SCRATCH"
 
-echo "=== [3/4] Build ServiceLib for net48 ==="
+echo "=== [3/5] Restore the whole solution (incl. the WPF project) ==="
 cd "$SCRATCH"
 export DOTNET_CLI_TELEMETRY_OPTOUT=1
 export DOTNET_NOLOGO=1
+
+# Restore works off-Windows even for the WPF project, so this catches package
+# graph problems in v2rayN.csproj that building ServiceLib alone would miss.
+# Concretely: the WPF project reaches System.Threading.Channels through
+# ReactiveUI.WPF -> ReactiveUI.Primitives, which requires a 10.x version. A
+# central pin below that fails restore with NU1109 only in v2rayN.csproj, i.e.
+# invisible to a ServiceLib-only check.
+"$DOTNET" restore v2rayN.sln -v minimal -nologo
+
+echo "=== [4/5] Build ServiceLib for net48 ==="
 
 # Do NOT set BuildNet48=true: that flag is what *re-enables* the
 # ServiceLib.UdpTest ProjectReference. UdpTest targets .NET 5+ Stream/Socket
@@ -63,7 +73,7 @@ export DOTNET_NOLOGO=1
   -v minimal \
   -nologo
 
-echo "=== [4/4] Assert native SQLite reaches the output ==="
+echo "=== [5/5] Assert native SQLite reaches the output ==="
 OUT="$SCRATCH/ServiceLib/bin/Release/net48"
 missing=""
 for f in ServiceLib.dll SQLitePCLRaw.core.dll SQLitePCLRaw.provider.e_sqlite3.dll; do

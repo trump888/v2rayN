@@ -89,7 +89,12 @@
     <PackageVersion Include="System.Text.Json" Version="10.0.12" />
     <PackageVersion Include="System.Memory" Version="4.6.3" />
     <PackageVersion Include="System.Buffers" Version="4.6.1" />
-    <PackageVersion Include="System.Threading.Channels" Version="8.0.0" />
+    <!-- 10.0.11, not 8.0.0: ReactiveUI.WPF 24.2.0 -> ReactiveUI.Primitives.Wpf
+         ReactiveUI.Primitives 8.2.0 requires System.Threading.Channels >= 10.0.12, and central pinning
+         below that trips NU1109 (detected package downgrade). Upstream does not
+         pin this package at all; it arrives transitively. 10.0.11 ships
+         lib/net462 + lib/netstandard2.0, so net48 can still bind it. -->
+    <PackageVersion Include="System.Threading.Channels" Version="10.0.12" />
     <PackageVersion Include="Microsoft.Bcl.AsyncInterfaces" Version="10.0.12" />
     <!-- 4.6.2 (not 4.6.1): ReactiveUI 24.3.0 declares a transitive
          System.ValueTuple >= 4.6.2, and central pinning below that trips
