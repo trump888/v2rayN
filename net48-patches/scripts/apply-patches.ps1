@@ -286,7 +286,25 @@ foreach ($proj in $buildableProjects) {
     }
 }
 
-# 5. UdpTest must stay excluded: it targets .NET 5+ Stream/Socket overloads.
+# 5. app.manifest must declare supportedOS. Without it, .NET Framework reports
+#    Environment.OSVersion as 6.2 on every Windows, and
+#    CoreInfoManager.GetCheckUpdateCoreTypes() then hides Xray, mihomo and
+#    sing-box from the update page on all of them. It compiles either way, so
+#    only an explicit assertion catches a regression here.
+$appManifestPath = Join-Path $SourceDir "v2rayN/app.manifest"
+if (Test-Path $appManifestPath) {
+    $manifestText = Get-Content $appManifestPath -Raw -Encoding UTF8
+    if ($manifestText -notmatch '8e0f7a12-bfb3-4fe8-b9a5-48fd50a15a9a') {
+        $violations += "v2rayN/app.manifest does not declare the Windows 10 supportedOS GUID (Environment.OSVersion would report 6.2 and the update page would lose Xray/mihomo/sing-box)"
+    }
+    try {
+        [xml]$manifestXml = $manifestText
+    } catch {
+        $violations += "v2rayN/app.manifest is not well-formed XML ($($_.Exception.Message))"
+    }
+}
+
+# 6. UdpTest must stay excluded: it targets .NET 5+ Stream/Socket overloads.
 $udpRefs = @($buildableProjects |
     Select-String -Pattern 'ProjectReference[^>]*ServiceLib\.UdpTest' -ErrorAction SilentlyContinue |
     Where-Object { $_.Line -notmatch "BuildNet48" })

@@ -659,6 +659,73 @@ foreach ($f in $csFilesWpf) {
 # net10.0-windows, and the interface is identical across TFMs within the same
 # package version. So the file needs no edit at all on net48.
 
+# 19d: app.manifest — declare supportedOS, without which Environment.OSVersion lies
+#
+# Upstream's app.manifest has no <compatibility> section, which is fine on
+# net10.0-windows: .NET 5+ always returns the real OS version. On .NET Framework
+# it is not fine — without a supportedOS declaration Environment.OSVersion
+# returns 6.2 (Windows 8) no matter what is really running.
+#
+# That is not cosmetic here. CoreInfoManager.GetCheckUpdateCoreTypes() does:
+#
+#   if (!(Utils.IsWindows() && Environment.OSVersion.Version.Major < 10))
+#       lst.Add(Xray); lst.Add(mihomo); lst.Add(sing_box);
+#
+# so a hardcoded Major of 6 makes the test false on *every* Windows, and the
+# update page silently loses Xray, mihomo and sing-box. It builds clean and
+# looks like a missing-feature bug rather than a runtime misreport.
+#
+# Declaring the OSes the port actually supports (Win7 through Win11) makes
+# OSVersion truthful everywhere. Per Microsoft, declaring Windows 10 support
+# "will not have any effect when running your app on previous operating
+# systems", so listing Windows 10 alongside Windows 7 does not cost Win7 its
+# compatibility behaviour — it only tells Windows 10/11 not to lie to us.
+#
+# Applied to upstream's own manifest rather than shipping a replacement, and
+# skipped if a <compatibility> section is already present, so a future upstream
+# manifest that declares its own supportedOS list is left alone.
+#
+# The <application>/<windowsSettings> block in the same pass sets PerMonitorV2
+# DPI awareness, which v2rayN.csproj already claims is "enabled via app.manifest
+# (already present)" - it was not present, so on .NET Framework the port ran
+# DPI-unaware and rendered blurry on scaled displays while upstream on net10.0
+# is PerMonitorV2 by default. `true/pm` covers Win8.1+, the 2016-namespace
+# dpiAwareness refines it to PerMonitorV2 on Win10+, and Win7 ignores both.
+$appManifest = Join-Path $SourceDir "v2rayN/app.manifest"
+if (Test-Path $appManifest) {
+    $manifest = Get-Content $appManifest -Raw -Encoding UTF8
+    if ($manifest -notmatch '<compatibility') {
+        $supportedOs = @'
+	<application xmlns="urn:schemas-microsoft-com:asm.v3">
+		<windowsSettings>
+			<dpiAware xmlns="http://schemas.microsoft.com/SMI/2005/WindowsSettings">true/pm</dpiAware>
+			<dpiAwareness xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">PerMonitorV2, PerMonitor</dpiAwareness>
+		</windowsSettings>
+	</application>
+	<compatibility xmlns="urn:schemas-microsoft-com:compatibility.v1">
+		<application>
+			<!-- Windows 10 / 11 -->
+			<supportedOS Id="{8e0f7a12-bfb3-4fe8-b9a5-48fd50a15a9a}" />
+			<!-- Windows 8.1 -->
+			<supportedOS Id="{1f676c76-80e1-4239-95bb-83d0f6d0da78}" />
+			<!-- Windows 8 -->
+			<supportedOS Id="{4a2f28e3-53b9-4441-ba9c-d69d4a4a6e38}" />
+			<!-- Windows 7 -->
+			<supportedOS Id="{35138b9a-5d96-4fbd-8e2d-a2440225f93a}" />
+		</application>
+	</compatibility>
+</assembly>
+'@
+        # The manifest ends with </assembly>; append the sections just before it.
+        $manifest = $manifest -replace '(?s)</assembly>\s*$', $supportedOs
+        [System.IO.File]::WriteAllText($appManifest, $manifest, [System.Text.UTF8Encoding]::new($false))
+        $rewriteCount++
+        Write-Host "    patched app.manifest (supportedOS + PerMonitorV2 DPI awareness)"
+    } else {
+        Write-Step "app.manifest already declares <compatibility>; left alone"
+    }
+}
+
 # ---------------------------------------------------------------------------
 # Rewrite 20: [GeneratedRegex] source-generated regex -> cached static Regex
 # ---------------------------------------------------------------------------

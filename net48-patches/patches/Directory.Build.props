@@ -58,6 +58,56 @@
         <InvariantGlobalization>false</InvariantGlobalization>
     </PropertyGroup>
 
+    <!-- ======================================================= -->
+    <!-- NET48 PORT: trim SkiaSharp native payload.              -->
+    <!--                                                        -->
+    <!-- ZXing.Net.Bindings.SkiaSharp (the QR generator) drags  -->
+    <!-- in SkiaSharp, which fans out to two native packages    -->
+    <!-- that between them put 137 MB of dead weight in the     -->
+    <!-- output for an x64 Windows build that needs 11 MB:      -->
+    <!--                                                        -->
+    <!--   libSkiaSharp.pdb        80.1 MB  runtimes/win-x64/   -->
+    <!--                                    native/, debug-only -->
+    <!--   libSkiaSharp.dylib      14.5 MB  macOS, from the    -->
+    <!--                                    macOS package's      -->
+    <!--                                    buildTransitive     -->
+    <!--                                    targets, which copy -->
+    <!--                                    unconditionally     -->
+    <!--                                    and ignore the RID -->
+    <!--   x86/ + arm64/ copies    19.6 MB  other              -->
+    <!--                                    architectures       -->
+    <!--                                                        -->
+    <!-- ShouldIncludeNativeSkiaSharp=False is the opt-out     -->
+    <!-- both native packages expose. It removes the arch       -->
+    <!-- subdirectories and the dylib. The Windows native still -->
+    <!-- lands in the output root, because it arrives through   -->
+    <!-- the SDK's own RID asset resolution (NativeCopyLocalItems)-->
+    <!-- not through those packages' targets, so turning this    -->
+    <!-- off does not lose libSkiaSharp.dll.                     -->
+    <!--                                                        -->
+    <!-- Measured on a clean net48 ServiceLib build:             -->
+    <!--   before  137.14 MB of SkiaSharp files                  -->
+    <!--   after    11.83 MB (libSkiaSharp.dll + 2 managed)      -->
+    <!--                                                        -->
+    <!-- The second target drops native .pdb files from the     -->
+    <!-- copy list. Every file under runtimes/<rid>/native/ is  -->
+    <!-- treated as a native runtime asset, and libSkiaSharp.pdb -->
+<!-- sits right next to libSkiaSharp.dll, so it is copied   -->
+    <!-- whether or not it is wanted. DebugType=embedded below  -->
+    <!-- makes shipping symbols pointless even for the managed   -->
+    <!-- assemblies: symbols are a build-time aid, and this one  -->
+    <!-- costs 80 MB and buys nothing at runtime.                -->
+    <!-- ======================================================= -->
+    <PropertyGroup>
+        <ShouldIncludeNativeSkiaSharp>False</ShouldIncludeNativeSkiaSharp>
+    </PropertyGroup>
+
+    <Target Name="_net48TrimNativeDebugSymbols" AfterTargets="ResolvePackageAssets">
+        <ItemGroup>
+            <NativeCopyLocalItems Remove="@(NativeCopyLocalItems)" Condition="'%(Extension)' == '.pdb'" />
+        </ItemGroup>
+    </Target>
+
     <!-- Linux/macOS need this package to provide net48 reference assemblies -->
     <!-- (System.Threading.Tasks, System.IO, System.Collections.Generic etc.) -->
     <!-- On Windows + VS 2022 with .NET Framework 4.8 Dev Pack installed, this -->

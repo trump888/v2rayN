@@ -226,6 +226,22 @@ jobs:
           # package; its presence means the port regressed to ReactiveUI 19.x.
           $forbidden = @('FodyWeavers.exe', 'ReactiveUI.Fody.dll')
 
+          # SkiaSharp payload budget. ZXing.Net.Bindings.SkiaSharp -> SkiaSharp
+          # pulls two native packages that between them add ~126 MB of files a
+          # win-x64 build never loads: an 80 MB libSkiaSharp.pdb, a 14.5 MB
+          # macOS dylib (copied unconditionally by that package's buildTransitive
+          # targets, which ignore the RID), and x86/arm64 copies of the native.
+          # Directory.Build.props suppresses all of them and drops native .pdb
+          # files. Assert both directions: the waste must be gone, and the one
+          # native we do need must still be there.
+          $required += 'libSkiaSharp.dll'
+          $forbidden += @('libSkiaSharp.pdb', 'libSkiaSharp.dylib')
+          foreach ($arch in @('x86', 'x64', 'arm64')) {
+            if (Test-Path (Join-Path $binDir "$arch/libSkiaSharp.dll")) {
+              $forbidden += "$arch/libSkiaSharp.dll"
+            }
+          }
+
           $missing = $required   | Where-Object { -not (Test-Path (Join-Path $binDir $_)) }
           $present = $forbidden | Where-Object { Test-Path (Join-Path $binDir $_) }
 
@@ -236,7 +252,7 @@ jobs:
             exit 1
           }
           if ($present) {
-            Write-Error "publish output contains removed ReactiveUI.Fody artifacts: $($present -join ', ')"
+            Write-Error "publish output contains files it must not (ReactiveUI.Fody artifacts, or SkiaSharp debug symbols / foreign-architecture natives): $($present -join ', ')"
             exit 1
           }
 
