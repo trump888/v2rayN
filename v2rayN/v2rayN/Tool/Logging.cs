@@ -33,14 +33,18 @@ namespace v2rayN.Tool
             roller.ActivateOptions();
             hierarchy.Root.AddAppender(roller);
 
-            // Bounded. log4net's MemoryAppender keeps every event it receives, so
-            // an unbounded one grows for as long as the app is open -- a slow leak
-            // in a tray application that is expected to run for days. 500 events
-            // is far more than the in-memory log view needs and still keeps the
-            // recent tail available.
-            var memory = new MemoryAppender { MaxBufferSize = 500 };
-            memory.ActivateOptions();
-            hierarchy.Root.AddAppender(memory);
+            // There was a MemoryAppender here too. It was dead weight:
+            //   - nothing ever read it. There is no GetEvents() call anywhere in
+            //     the tree, and the log view reads the guiLogs files off disk.
+            //   - log4net's MemoryAppender retains every event it receives and has
+            //     no MaxBufferSize to bound it (2.0.17 exposes only OnlyFixPartial-
+            //     EventData and Fix), so it grew for as long as the app was open.
+            //     In a tray application expected to run for days that is a slow
+            //     leak, and it cost a retention on every single log event to feed
+            //     a consumer that did not exist.
+            //
+            // Left out. If an in-memory log view is ever wanted, add a bounded
+            // appender at that point -- do not reintroduce this one.
 
             hierarchy.Root.Level = Level.Debug;
             hierarchy.Configured = true;
