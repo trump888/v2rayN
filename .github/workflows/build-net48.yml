@@ -291,12 +291,22 @@ jobs:
             finally { $fs.Dispose() }
           }
 
-          # assemblyName -> the newVersions v2rayN.exe.config redirects it to
+          # assemblyName -> the newVersions v2rayN.exe.config redirects it to.
+          # Parsed with a regex over the raw text on purpose: the generated
+          # <assemblyBinding> sits in the urn:schemas-microsoft-com:asm.v1
+          # default namespace, and navigating that through PowerShell's XML
+          # adapter silently yields nothing (which made every reference look
+          # unresolved).
           $redirects = @{}
-          $cfgXml = [xml]$cfgText
-          foreach ($asmNode in $cfgXml.configuration.runtime.assemblyBinding.assembly) {
-            $redirects[[string]$asmNode.assemblyName] =
-              @($asmNode.bindingRedirect | ForEach-Object { [string]$_.newVersion })
+          foreach ($blk in [regex]::Matches($cfgText, '(?s)<assembly>.*?</assembly>')) {
+            $nm = [regex]::Match($blk.Value, 'name="([^"]+)"')
+            if (-not $nm.Success) { continue }
+            $redirects[$nm.Groups[1].Value] =
+              @([regex]::Matches($blk.Value, 'newVersion="([^"]+)"') | ForEach-Object { $_.Groups[1].Value })
+          }
+          Write-Host "binding redirects in v2rayN.exe.config:"
+          foreach ($k in ($redirects.Keys | Sort-Object)) {
+            Write-Host "  $k -> $($redirects[$k] -join ', ')"
           }
 
           $managed = @()
