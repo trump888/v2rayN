@@ -44,11 +44,11 @@
           AfterTargets="ResolveAssemblyReferences;ResolvePackageAssets">
     <ItemGroup>
       <ReferenceCopyLocalPaths Remove="@(ReferenceCopyLocalPaths)"
-                               Condition="'%(Filename)' == 'grpc_csharp_ext.%(UnusedNativeArch)'" />
+                               Condition="'%(Filename)' == 'grpc_csharp_ext.$(UnusedNativeArch)'" />
       <RuntimeCopyLocalItems Remove="@(RuntimeCopyLocalItems)"
-                             Condition="'%(Filename)' == 'grpc_csharp_ext.%(UnusedNativeArch)'" />
+                             Condition="'%(Filename)' == 'grpc_csharp_ext.$(UnusedNativeArch)'" />
       <NativeCopyLocalItems Remove="@(NativeCopyLocalItems)"
-                            Condition="'%(Filename)' == 'grpc_csharp_ext.%(UnusedNativeArch)'" />
+                            Condition="'%(Filename)' == 'grpc_csharp_ext.$(UnusedNativeArch)'" />
     </ItemGroup>
   </Target>
 
