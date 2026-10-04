@@ -14,11 +14,13 @@ namespace v2rayN.Mode
         WireGuard = 9,
         HTTP = 10,
         Mieru = 11,
-        // 12 matches the value 7.x uses, so a profile exported from the newer
-        // build keeps its meaning. Only the enum value so far: the sing-box
-        // generator exists (Handler/SingboxConfigHandler.cs) and is validated
-        // against `sing-box check` in CI, but the AddServerForm UI and the
-        // share-link parser are not wired up yet, so this type is not offered.
+        // 12 is deliberately NOT the value 7.x uses for AnyTLS (11). 11 is Mieru
+        // here, and these values are persisted in existing server configurations,
+        // so renumbering Mieru to make AnyTLS match would repoint every saved
+        // Mieru profile. The two builds cannot exchange raw configs anyway
+        // (different models); share links are the interchange format and those
+        // are protocol-based, so the number only has to be stable within this
+        // build. 12 is unused here.
         AnyTLS = 12
     }
 }

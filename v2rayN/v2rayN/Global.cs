@@ -187,6 +187,7 @@ namespace v2rayN
         /// hysteria2
         /// </summary>
         public const string hysteria2Protocol = "hysteria2://";
+        public const string anytlsProtocol = "anytls://";
         /// <summary>
         /// hysteria2
         /// </summary>

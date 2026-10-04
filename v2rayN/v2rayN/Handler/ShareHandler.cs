@@ -98,6 +98,9 @@ namespace v2rayN.Handler
                     case EConfigType.Hysteria2:
                         url = ShareHysteria2(item);
                         break;
+                    case EConfigType.AnyTLS:
+                        url = ShareAnyTLS(item);
+                        break;
                     case EConfigType.Mieru:
                         url = ShareMieru(item);
                         break;
@@ -270,6 +273,44 @@ namespace v2rayN.Handler
             GetIpv6(item.address),
             item.port);
             url = $"{Global.hysteria2Protocol}{url}{query}{remark}";
+            return url;
+        }
+
+        private static string ShareAnyTLS(VmessItem item)
+        {
+            string url = string.Empty;
+            string remark = string.Empty;
+            if (!Utils.IsNullOrEmpty(item.remarks))
+            {
+                remark = "#" + Utils.UrlEncode(item.remarks);
+            }
+
+            var dicQuery = new Dictionary<string, string>();
+            if (!Utils.IsNullOrEmpty(item.sni))
+            {
+                dicQuery["sni"] = item.sni;
+            }
+            if (item.alpn is { Count: > 0 })
+            {
+                dicQuery["alpn"] = Utils.UrlEncode(Utils.List2String(item.alpn));
+            }
+            if (!Utils.IsNullOrEmpty(item.fingerprint))
+            {
+                dicQuery["fingerprint"] = item.fingerprint;
+            }
+            if (!Utils.IsNullOrEmpty(item.allowInsecure))
+            {
+                dicQuery["insecure"] = item.allowInsecure;
+            }
+
+            string query = dicQuery.Count > 0 ? "?" + string.Join("&", dicQuery.Select(x => x.Key + "=" + x.Value).ToArray()) : "";
+
+            // anytls://<password>@<host>:<port>[?query][#remark]
+            url = string.Format("{0}@{1}:{2}",
+            Utils.UrlEncode(item.id),
+            GetIpv6(item.address),
+            item.port);
+            url = $"{Global.anytlsProtocol}{url}{query}{remark}";
             return url;
         }
 
@@ -510,6 +551,16 @@ namespace v2rayN.Handler
                     Utils.SaveLog($"Try parse hysteria2: {result.Substring(0, Math.Min(100, result.Length))}");
                     vmessItem = ResolveHysteria2(result);
                     Utils.SaveLog($"ResolveHysteria2 result: {vmessItem == null}");
+                    if (vmessItem == null)
+                    {
+                        msg = ResUI.ConfigurationFormatIncorrect;
+                        return null;
+                    }
+                }
+                else if (result.StartsWith(Global.anytlsProtocol))
+                {
+                    Utils.SaveLog($"Try parse anytls: {result.Substring(0, Math.Min(100, result.Length))}");
+                    vmessItem = ResolveAnyTLS(result);
                     if (vmessItem == null)
                     {
                         msg = ResUI.ConfigurationFormatIncorrect;
@@ -936,6 +987,35 @@ namespace v2rayN.Handler
             item.security = query["encryption"] ?? "none";
             item.streamSecurity = query["security"] ?? "";
             ResolveStdTransport(query, ref item);
+
+            return item;
+        }
+
+        private static VmessItem ResolveAnyTLS(string result)
+        {
+            VmessItem item = new VmessItem
+            {
+                configType = EConfigType.AnyTLS
+            };
+
+            var url = TryParseUri(result, Global.anytlsProtocol);
+            if (url == null) return null;
+
+            item.address = url.IdnHost;
+            item.port = url.Port;
+            item.remarks = url.GetComponents(UriComponents.Fragment, UriFormat.Unescaped);
+            // Matches 7.x AnytlsFmt: the whole userinfo is the password, there is
+            // no user/password split for this protocol.
+            item.id = Utils.UrlDecode(url.UserInfo);
+
+            var query = HttpUtility.ParseQueryString(url.Query);
+            item.sni = query["sni"] ?? "";
+            item.fingerprint = query["fingerprint"] ?? "";
+            item.alpn = Utils.String2List(Utils.UrlDecode(query["alpn"] ?? ""));
+            if (query["insecure"] != null)
+            {
+                item.allowInsecure = query["insecure"];
+            }
 
             return item;
         }
