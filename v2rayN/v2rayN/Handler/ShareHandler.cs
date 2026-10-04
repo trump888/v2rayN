@@ -319,6 +319,7 @@ namespace v2rayN.Handler
 
         private static string ShareNaive(VmessItem item)
         {
+            string url = string.Empty;
             string remark = string.Empty;
             if (!Utils.IsNullOrEmpty(item.remarks))
             {
