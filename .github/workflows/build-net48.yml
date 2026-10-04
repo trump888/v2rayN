@@ -240,23 +240,93 @@ jobs:
             exit 1
           }
 
-          # Sanity-check that the generated binding redirects actually made it
-          # into v2rayN.exe.config; .NET Framework cannot resolve
-          # System.Memory/System.Buffers without them.
+          # Binding redirects on .NET Framework.
+          #
+          # System.Memory and System.Buffers genuinely need them: older
+          # MaterialDesignThemes/ReactiveUI builds reference 4.0.1.x while the
+          # port ships 4.0.5.0, and AutoGenerateBindingRedirects emits a redirect
+          # for that difference.
+          #
+          # System.Text.Json does NOT need one, and demanding it was a false
+          # alarm. The shipped System.Text.Json.dll (package 10.0.12) has
+          # assembly identity 10.0.0.12, which is exactly the version
+          # ServiceLib.dll references, so .NET Framework resolves it with no
+          # redirect. AutoGenerateBindingRedirects only emits a redirect when a
+          # referenced version differs from the shipped one, so a matching
+          # version correctly produces none.
+          #
+          # Instead of hardcoding a list of names that "should" have a redirect,
+          # assert the invariant that actually decides loadability: for every
+          # assembly reference in the output that resolves to a file we also
+          # ship, the referenced version must match the shipped version, or
+          # v2rayN.exe.config must carry a binding redirect for it pointing at
+          # the shipped version. That covers System.Text.Json today and any
+          # future package bump, instead of trusting three hardcoded strings.
           $cfg = Join-Path $binDir 'v2rayN.exe.config'
           if (-not (Test-Path $cfg)) {
             Write-Error "v2rayN.exe.config is missing (no binding redirects on .NET Framework)"
             exit 1
           }
           $cfgText = Get-Content $cfg -Raw
-          foreach ($asm in @('System.Memory', 'System.Buffers', 'System.Text.Json')) {
+          foreach ($asm in @('System.Memory', 'System.Buffers')) {
             if ($cfgText -notmatch [regex]::Escape($asm)) {
               Write-Error "v2rayN.exe.config has no binding redirect for $asm"
               exit 1
             }
           }
 
-          Write-Host "publish output verified: $($required.Count) required files present, binding redirects OK"
+          function Get-AssemblyRefs([string]$path) {
+            $fs = [System.IO.File]::OpenRead($path)
+            try {
+              $pe = [System.Reflection.PortableExecutable.PEReader]::new($fs)
+              try { $md = [System.Reflection.Metadata.PEReaderExtensions]::GetMetadataReader($pe) }
+              catch { return $null }   # native DLL (e_sqlite3.dll, libSkiaSharp.dll, ...)
+              $out = @{}
+              foreach ($h in $md.AssemblyReferences) {
+                $r = $md.GetAssemblyReference($h)
+                $out[$md.GetString($r.Name)] = $r.Version.ToString()
+              }
+              return $out
+            }
+            finally { $fs.Dispose() }
+          }
+
+          # assemblyName -> the newVersions v2rayN.exe.config redirects it to
+          $redirects = @{}
+          $cfgXml = [xml]$cfgText
+          foreach ($asmNode in $cfgXml.configuration.runtime.assemblyBinding.assembly) {
+            $redirects[[string]$asmNode.assemblyName] =
+              @($asmNode.bindingRedirect | ForEach-Object { [string]$_.newVersion })
+          }
+
+          $managed = @()
+          $shippedVersions = @{}
+          foreach ($dll in Get-ChildItem $binDir -Filter *.dll) {
+            $refs = Get-AssemblyRefs $dll.FullName
+            if ($null -eq $refs) { continue }          # not a managed assembly
+            $managed += $dll
+            try { $shippedVersions[$dll.BaseName] = [System.Reflection.AssemblyName]::GetAssemblyName($dll.FullName).Version.ToString() }
+            catch { continue }
+          }
+
+          $unresolved = @()
+          foreach ($dll in $managed) {
+            $refs = Get-AssemblyRefs $dll.FullName
+            foreach ($name in $refs.Keys) {
+              if (-not $shippedVersions.ContainsKey($name)) { continue }
+              if ($refs[$name] -eq $shippedVersions[$name]) { continue }
+              # a redirect pointing at the shipped version resolves the difference
+              if ($redirects.ContainsKey($name) -and ($redirects[$name] -contains $shippedVersions[$name])) { continue }
+              $unresolved += "$($dll.Name) references $name $($refs[$name]) but $($shippedVersions[$name]) is shipped, with no binding redirect"
+            }
+          }
+          if ($unresolved) {
+            Write-Error "output has assembly references that would fail to bind on .NET Framework:"
+            $unresolved | Select-Object -First 20 | ForEach-Object { Write-Host "  $_" }
+            exit 1
+          }
+
+          Write-Host "publish output verified: $($required.Count) required files present, $($managed.Count) managed assemblies bind, redirects OK"
 
       - name: Collect build outputs
         shell: pwsh
