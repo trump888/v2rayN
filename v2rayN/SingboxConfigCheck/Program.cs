@@ -59,6 +59,10 @@ namespace SingboxConfigCheck
             CoreTable();
 
             Console.WriteLine();
+            Console.WriteLine("== add-server form ==");
+            Form();
+
+            Console.WriteLine();
             Console.WriteLine($"{_passed} passed, {_failed} failed");
             return _failed == 0 ? 0 : 1;
         }
@@ -151,6 +155,93 @@ namespace SingboxConfigCheck
             Check(rc2 == 0, "GenerateClientConfig still succeeds for VMess");
             Check(v2rayContent.Contains("\"outbounds\"") && !v2rayContent.Contains("\"anytls\""),
                   "VMess still generates v2ray JSON");
+        }
+
+        /// <summary>
+        /// The WinForms dialog, exercised for real. A Windows runner can construct
+        /// WinForms without an interactive desktop, so this is not eyeballing a
+        /// screenshot: it drives the same code paths the user does.
+        ///
+        /// This is here because it found a real bug. AddServerForm used to call
+        /// AddNewProtocolControls() from its constructor, but MainForm assigns
+        /// eConfigType only *after* the constructor returns, so eConfigType was 0 and
+        /// no protocol branch ever matched. Hysteria2, Mieru and TUIC had been
+        /// showing no Up/Down Mbps, Obfs or Cert SHA256 fields, and the null guards
+        /// in BindingServer turned that into silence rather than an error.
+        /// </summary>
+        private static void Form()
+        {
+            try
+            {
+                using var f = new v2rayN.Forms.AddServerForm();
+                Check(f != null, "AddServerForm constructs headlessly");
+
+                // Same order MainForm.ShowServerForm uses: construct, then set.
+                f.eConfigType = EConfigType.AnyTLS;
+                Check(f.eConfigType == EConfigType.AnyTLS, "form accepts AnyTLS as its protocol");
+
+                // Now drive Load the way the runtime does. OnLoad is what actually
+                // calls AddNewProtocolControls; raising it directly is what a
+                // ShowDialog would do.
+                var onLoad = typeof(v2rayN.Forms.AddServerForm)
+                    .GetMethod("AddServerForm_Load",
+                               System.Reflection.BindingFlags.Instance |
+                               System.Reflection.BindingFlags.NonPublic);
+                Check(onLoad != null, "AddServerForm_Load is reachable for the test");
+                if (onLoad != null)
+                {
+                    onLoad.Invoke(f, new object[] { f, EventArgs.Empty });
+                }
+
+                // The bug: these controls come from AddNewProtocolControls, which
+                // used to be called too early to add anything.
+                var anyTlsControls = new System.Windows.Forms.ControlCollection(f.Controls);
+                Check(anyTlsControls.Count > 0, "form has controls after Load");
+
+                // AnyTLS-specific controls, created dynamically by AddNewProtocolControls.
+                var sni = FindControl(f, "txtSni");
+                var fp = FindControl(f, "cmbFingerprint");
+                var insecure = FindControl(f, "chkAllowInsecure");
+                Check(sni != null, "AnyTLS SNI field is created");
+                Check(fp != null, "AnyTLS fingerprint combo is created");
+                Check(insecure != null, "AnyTLS allow-insecure checkbox is created");
+
+                // And the regression: the same must now be true for Hysteria2, whose
+                // fields were the ones silently missing.
+                using var h2 = new v2rayN.Forms.AddServerForm();
+                h2.eConfigType = EConfigType.Hysteria2;
+                var h2load = typeof(v2rayN.Forms.AddServerForm)
+                    .GetMethod("AddServerForm_Load",
+                               System.Reflection.BindingFlags.Instance |
+                               System.Reflection.BindingFlags.NonPublic);
+                h2load?.Invoke(h2, new object[] { h2, EventArgs.Empty });
+                Check(FindControl(h2, "txtUpMbps") != null,
+                      "Hysteria2 Up/Down Mbps fields now exist (were silently missing)");
+                Check(FindControl(h2, "cmbObfs") != null,
+                      "Hysteria2 Obfs combo now exists (were silently missing)");
+                Check(FindControl(h2, "txtCertSha256") != null,
+                      "Hysteria2 Cert SHA256 field now exists (were silently missing)");
+            }
+            catch (Exception ex)
+            {
+                Check(false, $"form test threw: {ex.GetType().Name}: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Find a dynamically-added control. AddNewProtocolControls builds these in
+        /// code rather than in the designer, so they have no generated field to
+        /// reference and have to be located by walking the control tree.
+        /// </summary>
+        private static System.Windows.Forms.Control FindControl(System.Windows.Forms.Control root, string name)
+        {
+            foreach (System.Windows.Forms.Control c in root.Controls)
+            {
+                if (c.Name == name) return c;
+                var hit = FindControl(c, name);
+                if (hit != null) return hit;
+            }
+            return null;
         }
 
         /// <summary>

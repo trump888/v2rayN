@@ -15,11 +15,21 @@ namespace v2rayN.Forms
         private ComboBox cmbObfs;
         private TextBox txtCertSha256;
         private Label lblUpMbps, lblDownMbps, lblObfs, lblObfsPassword, lblCertSha256;
+        private TextBox txtSni;
+        private ComboBox cmbFingerprint;
+        private CheckBox chkAllowInsecure;
+        private Label lblSni, lblFingerprint;
 
         public AddServerForm()
         {
             InitializeComponent();
-            AddNewProtocolControls();
+            // AddNewProtocolControls() is deliberately NOT called here.
+            // MainForm.ShowServerForm assigns fm.eConfigType *after* the constructor
+            // returns, so at construction time eConfigType is still 0 and the
+            // protocol branches never matched -- which is why Hysteria2, Mieru and
+            // TUIC silently showed no Up/Down Mbps, Obfs or Cert SHA256 fields, and
+            // the null guards in BindingServer then hid it. It runs from
+            // AddServerForm_Load instead, where eConfigType is set.
         }
 
         private void AddNewProtocolControls()
@@ -82,6 +92,45 @@ namespace v2rayN.Forms
                     panVmess.Controls.Add(txtObfsPassword);
                 }
 
+                if (eConfigType == EConfigType.AnyTLS)
+                {
+                    // Only the three fields the sing-box generator and the
+                    // anytls:// share link actually use. The shared sni /
+                    // fingerprint / allowInsecure fields on VmessItem are reused;
+                    // no new model fields were needed.
+                    yPos += 25;
+                    lblSni = new Label();
+                    lblSni.Text = "SNI:";
+                    lblSni.Location = new System.Drawing.Point(10, yPos);
+                    lblSni.Size = new System.Drawing.Size(70, 20);
+                    panVmess.Controls.Add(lblSni);
+
+                    txtSni = new TextBox();
+                    txtSni.Location = new System.Drawing.Point(85, yPos - 3);
+                    txtSni.Size = new System.Drawing.Size(250, 20);
+                    panVmess.Controls.Add(txtSni);
+
+                    yPos += 25;
+                    lblFingerprint = new Label();
+                    lblFingerprint.Text = "Fingerprint:";
+                    lblFingerprint.Location = new System.Drawing.Point(10, yPos);
+                    lblFingerprint.Size = new System.Drawing.Size(70, 20);
+                    panVmess.Controls.Add(lblFingerprint);
+
+                    cmbFingerprint = new ComboBox();
+                    cmbFingerprint.Location = new System.Drawing.Point(85, yPos - 3);
+                    cmbFingerprint.Size = new System.Drawing.Size(150, 20);
+                    cmbFingerprint.Items.AddRange(new object[] { "", "chrome", "firefox", "safari", "ios", "android", "edge", "random", "360", "qq" });
+                    panVmess.Controls.Add(cmbFingerprint);
+
+                    yPos += 25;
+                    chkAllowInsecure = new CheckBox();
+                    chkAllowInsecure.Text = "Allow Insecure";
+                    chkAllowInsecure.Location = new System.Drawing.Point(85, yPos - 3);
+                    chkAllowInsecure.Size = new System.Drawing.Size(120, 20);
+                    panVmess.Controls.Add(chkAllowInsecure);
+                }
+
                 if (eConfigType == EConfigType.TUIC || eConfigType == EConfigType.Hysteria2)
                 {
                     yPos += 25;
@@ -102,6 +151,9 @@ namespace v2rayN.Forms
         private void AddServerForm_Load(object sender, EventArgs e)
         {
             Text = (eConfigType).ToString();
+
+            // See the constructor: has to be here, not there, so eConfigType is set.
+            AddNewProtocolControls();
             
             cmbCoreType.Items.AddRange(Global.coreTypes.ToArray());
             cmbCoreType.Items.Add(string.Empty);
@@ -145,6 +197,7 @@ namespace v2rayN.Forms
                 case EConfigType.Hysteria2:
                 case EConfigType.Mieru:
                 case EConfigType.TUIC:
+                case EConfigType.AnyTLS:
                     panVmess.Dock = DockStyle.Fill;
                     panVmess.Visible = true;
                     break;
@@ -196,6 +249,12 @@ namespace v2rayN.Forms
                 case EConfigType.Trojan:
                     txtId6.Text = vmessItem.id;
                     cmbFlow6.Text = vmessItem.flow;
+                    break;
+                case EConfigType.AnyTLS:
+                    txtId.Text = vmessItem.id;
+                    if (txtSni != null) txtSni.Text = vmessItem.sni ?? "";
+                    if (cmbFingerprint != null) cmbFingerprint.Text = vmessItem.fingerprint ?? "";
+                    if (chkAllowInsecure != null) chkAllowInsecure.Checked = vmessItem.allowInsecure == "true";
                     break;
                 case EConfigType.Hysteria2:
                 case EConfigType.Mieru:
@@ -290,6 +349,7 @@ namespace v2rayN.Forms
                 case EConfigType.Hysteria2:
                 case EConfigType.Mieru:
                 case EConfigType.TUIC:
+                case EConfigType.AnyTLS:
                     id = txtId.Text;
                     break;
             }
@@ -357,6 +417,15 @@ namespace v2rayN.Forms
                 if (txtCertSha256 != null)
                     vmessItem.certSha256 = txtCertSha256.Text;
             }
+            if (eConfigType == EConfigType.AnyTLS)
+            {
+                if (txtSni != null) vmessItem.sni = txtSni.Text;
+                if (cmbFingerprint != null) vmessItem.fingerprint = cmbFingerprint.Text;
+                // allowInsecure is a string on VmessItem, and the generator treats
+                // anything other than an explicit "true" as verify-on, so store the
+                // literal the share link uses.
+                if (chkAllowInsecure != null) vmessItem.allowInsecure = chkAllowInsecure.Checked ? "true" : "";
+            }
 
             int ret = -1;
             switch (eConfigType)
@@ -381,6 +450,7 @@ namespace v2rayN.Forms
                 case EConfigType.Hysteria2:
                 case EConfigType.Mieru:
                 case EConfigType.TUIC:
+                case EConfigType.AnyTLS:
                     ret = ConfigHandler.AddServer(ref config, vmessItem);
                     break;
             }

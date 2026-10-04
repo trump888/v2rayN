@@ -21,7 +21,7 @@
     <IsPackable>false</IsPackable>
     <AssemblyName>SingboxConfigCheck</AssemblyName>
     <RootNamespace>SingboxConfigCheck</RootNamespace>
-    <UseWindowsForms>false</UseWindowsForms>
+    <UseWindowsForms>true</UseWindowsForms>
   </PropertyGroup>
 
   <ItemGroup>
