@@ -1,18 +1,24 @@
-name: Build v2rayN
+name: Build v2rayN (5.39 net48, maintained)
 
 on:
   push:
-    branches: [mod-5.39]
+    branches: [net48-5.39-modern]
+  pull_request:
+    branches: [net48-5.39-modern]
+  schedule:
+    # Nightly. 5.39 no longer tracks an upstream source tree, so a periodic run
+    # is the only thing that notices when a dependency or a core release moves
+    # out from under us.
+    - cron: '17 20 * * *'
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: windows-latest
-    
+
     steps:
     - uses: actions/checkout@v4
       with:
-        ref: mod-5.39
         fetch-depth: 0
 
     - name: Setup MSBuild
@@ -26,8 +32,177 @@ jobs:
       run: |
         msbuild v2rayN/v2rayN.sln /p:Configuration=Release /p:Platform="Any CPU"
 
+    # ------------------------------------------------------------------------
+    # The publish output is the product. Building is not evidence that it runs:
+    # a missing native, an unresolvable assembly reference or a surprise native
+    # payload all produce a perfectly green build and a broken app. This step is
+    # ported from the net48-port-2026.10 branch, where the same class of defect
+    # was caught only after running the artifact.
+    # ------------------------------------------------------------------------
+    - name: Verify publish output is runnable
+      shell: pwsh
+      run: |
+        $binDir = "v2rayN/v2rayN/bin/Release"
+
+        if (-not (Test-Path $binDir)) {
+          Write-Error "build output not found at $binDir"
+          exit 1
+        }
+
+        $required = @(
+          'v2rayN.exe',
+          'Newtonsoft.Json.dll',
+          'log4net.dll',
+          'zxing.dll',
+          'Grpc.Core.dll',
+          'Google.Protobuf.dll',
+          'NHotkey.dll',
+          'NHotkey.WindowsForms.dll',
+          'System.Memory.dll',
+          'grpc_csharp_ext.x64.dll'
+        )
+
+        # The x86 gRPC native is deliberately not shipped: see
+        # v2rayN/Directory.Build.targets. It was 9.5 MB, 36% of the output, and
+        # unloadable in a 64-bit process.
+        $forbidden = @(
+          'grpc_csharp_ext.x86.dll'
+        )
+
+        $missing = $required   | Where-Object { -not (Test-Path (Join-Path $binDir $_)) }
+        $present = $forbidden | Where-Object { Test-Path (Join-Path $binDir $_) }
+
+        if ($missing) {
+          Write-Error "publish output missing required runtime files: $($missing -join ', ')"
+          Write-Host "Contents of ${binDir}:"
+          Get-ChildItem $binDir | Select-Object -ExpandProperty Name
+          exit 1
+        }
+        if ($present) {
+          Write-Error "publish output contains files it must not (unused-arch natives): $($present -join ', ')"
+          exit 1
+        }
+
+        # Assembly binding on .NET Framework.
+        #
+        # Without a binding redirect the loader refuses to bind a strong-named
+        # assembly whose shipped version differs from the one something
+        # references. NuGet ships gRPC, Protobuf and Newtonsoft.Json at versions
+        # their own references do not all agree on, so this genuinely happens.
+        #
+        # Only *strong-named* assemblies need a redirect. Simple-name assemblies
+        # (empty public key token) are bound by name alone and the version is
+        # ignored -- so do not flag those, or the check cries wolf.
+        function Get-AssemblyRefs([string]$path) {
+            $fs = [System.IO.File]::OpenRead($path)
+            try {
+              $pe = [System.Reflection.PortableExecutable.PEReader]::new($fs)
+              try { $md = [System.Reflection.Metadata.PEReaderExtensions]::GetMetadataReader($pe) }
+              catch { return $null }
+              $out = @{}
+              foreach ($h in $md.AssemblyReferences) {
+                $r = $md.GetAssemblyReference($h)
+                $out[$md.GetString($r.Name)] = $r.Version.ToString()
+              }
+              return $out
+            }
+            finally { $fs.Dispose() }
+          }
+
+        # v2rayN.exe.config carries the auto-generated redirects. MSBuild emits
+        # <dependentAssembly>, not the legacy <assembly> spelling, and the
+        # element sits in the asm.v1 default namespace, so parse by regex.
+        $cfg = Join-Path $binDir 'v2rayN.exe.config'
+        $redirects = @{}
+        if (Test-Path $cfg) {
+          $cfgText = Get-Content $cfg -Raw
+          foreach ($blk in [regex]::Matches($cfgText, '(?s)<(?:assembly|dependentAssembly)>(.*?)</(?:assembly|dependentAssembly)>')) {
+            $nm = [regex]::Match($blk.Value, 'name="([^"]+)"')
+            if (-not $nm.Success) { continue }
+            $redirects[$nm.Groups[1].Value] =
+              @([regex]::Matches($blk.Value, 'newVersion="([^"]+)"') | ForEach-Object { $_.Groups[1].Value })
+          }
+        }
+
+        $managed = @()
+        $shippedVersions = @{}
+        $shippedTokens = @{}
+        foreach ($dll in Get-ChildItem $binDir -Filter *.dll) {
+          $refs = Get-AssemblyRefs $dll.FullName
+          if ($null -eq $refs) { continue }        # native, no PE metadata
+          $managed += $dll
+          try {
+            $an = [System.Reflection.AssemblyName]::GetAssemblyName($dll.FullName)
+            $shippedVersions[$dll.BaseName] = $an.Version.ToString()
+            $tok = $an.GetPublicKeyToken()
+            $shippedTokens[$dll.BaseName] =
+              if ($null -eq $tok -or $tok.Length -eq 0) { '' } else { [System.BitConverter]::ToString($tok).Replace('-','').ToLowerInvariant() }
+          }
+          catch { continue }
+        }
+
+        $unresolved = @()
+        foreach ($dll in $managed) {
+          $refs = Get-AssemblyRefs $dll.FullName
+          foreach ($name in $refs.Keys) {
+            if (-not $shippedVersions.ContainsKey($name)) { continue }
+            if ($refs[$name] -eq $shippedVersions[$name]) { continue }
+            if ($redirects.ContainsKey($name) -and ($redirects[$name] -contains $shippedVersions[$name])) { continue }
+            if ($shippedTokens[$name] -eq '') { continue }   # simple-name: version ignored
+            $unresolved += "$($dll.Name) references $name $($refs[$name]) but $($shippedVersions[$name]) is shipped (strong-named), with no binding redirect"
+          }
+        }
+        if ($unresolved) {
+          $detail = ($unresolved | Select-Object -First 20) -join "`n  "
+          Write-Error "output has assembly references that would fail to bind on .NET Framework:`n  $detail"
+          exit 1
+        }
+
+        # Size budget. This artifact exists because it is the lightweight one;
+        # a silent re-fattening is the regression this branch exists to prevent.
+        # The floor is deliberately loose -- it is there to catch a new
+        # multi-megabyte native appearing, not to police small changes.
+        $totalMb = (Get-ChildItem $binDir -Recurse -File | Measure-Object Length -Sum).Sum / 1MB
+        Write-Host ("publish output verified: {0} required files, {1} managed assemblies bind, {2:N1} MB total" -f $required.Count, $managed.Count, $totalMb)
+        if ($totalMb -gt 22) {
+          Write-Error ("publish output is {0:N1} MB, over the 22 MB budget. If that is intended, find out what grew before raising the budget." -f $totalMb)
+          Get-ChildItem $binDir -File | Sort-Object Length -Descending | Select-Object -First 10 Name, Length
+          exit 1
+        }
+
+    # Informational only. 5.39 predates per-core update management, so it names
+    # core repositories as constants; some of those have moved or been deleted
+    # since. A green build says nothing about them, and a dead URL only shows up
+    # as a 404 when a user tries to update that core.
+    - name: Check core repositories (informational)
+      shell: pwsh
+      continue-on-error: true
+      run: |
+        $ProgressPreference = 'SilentlyContinue'
+        $globals = Get-Content v2rayN/v2rayN/Global.cs -Raw
+        $repos = [regex]::Matches($globals, 'github\.com/([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)/releases') |
+                 ForEach-Object { $_.Groups[1].Value } | Sort-Object -Unique
+        $headers = @{ 'User-Agent' = 'v2rayN-net48-check' }
+        if ($env:GITHUB_TOKEN) { $headers['Authorization'] = "Bearer $env:GITHUB_TOKEN" }
+        $bad = 0
+        foreach ($r in $repos) {
+          try {
+            $info = Invoke-RestMethod "https://api.github.com/repos/$r" -Headers $headers
+            $pushed = ([datetime]$info.pushed_at).ToString('yyyy-MM-dd')
+            $flag = if ($info.archived) { 'ARCHIVED' } elseif ($pushed -lt (Get-Date).AddYears(-2).ToString('yyyy-MM-dd')) { 'STALE' } else { 'ok' }
+            if ($flag -ne 'ok') { $bad++ }
+            Write-Host ("  {0,-8} {1,-34} last push {2}" -f $flag, $r, $pushed)
+          } catch {
+            $bad++
+            Write-Host ("  {0,-8} {1,-34} {2}" -f 'GONE', $r, $_.Exception.Message)
+          }
+        }
+        if ($bad -gt 0) {
+          Write-Warning "$bad of $($repos.Count) core repositories are gone, archived or stale. Updating them is a product decision, not a build fix -- see the branch README."
+        }
+
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: v2rayN-build
+        name: v2rayN-net48-build
         path: v2rayN/v2rayN/bin/Release/

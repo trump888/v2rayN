@@ -1,0 +1,61 @@
+<Project>
+
+  <!--
+    ============================================================================
+    Drop the unused x86 gRPC native transport
+    ============================================================================
+    Grpc.Core ships its native transport once per architecture under
+    runtimes/win/<arch>/native/. With no RuntimeIdentifier set (this solution is
+    AnyCPU) the SDK copies every one of them into the output, so the published
+    app carried both:
+
+        grpc_csharp_ext.x64.dll   12.10 MB
+        grpc_csharp_ext.x86.dll    9.52 MB
+
+    That x86 copy is 36% of the entire 26 MB output and can never be loaded on
+    a 64-bit process, which is what AnyCPU produces on every 64-bit Windows.
+    Same class of problem as the libSkiaSharp.pdb / libSkiaSharp.dylib /
+    arch-subdirectory copies removed from the net48-port-2026.10 branch: a
+    native payload copied for a target nobody runs.
+
+    TRADE-OFF, stated plainly: this makes the artifact effectively x64-only.
+    A 32-bit Windows process would no longer find the gRPC native and the
+    traffic-statistics feature (Handler/StatisticsHandler and friends, which
+    speak gRPC over that native library) would fail there. 32-bit Windows is a
+    small minority and the sibling net48-port-2026.10 branch is already x64-only,
+    so the two artifacts behave consistently.
+
+    To restore 32-bit support, delete this file.
+
+    The removal is done on the copy lists *and* as a post-build delete. The
+    copy-list filters are the correct fix, but which item group the SDK puts an
+    RID-less runtimes/** asset in depends on the SDK version, and a wrong item
+    group name is silently a no-op rather than an error -- so the delete is
+    there to make the outcome deterministic regardless.
+  -->
+
+  <PropertyGroup>
+    <!-- Keep this in one place: CI asserts the x64 native is present and the
+         x86 one is gone, so a silent regression fails the build. -->
+    <UnusedNativeArch>x86</UnusedNativeArch>
+  </PropertyGroup>
+
+  <Target Name="_net48DropUnusedArchNatives"
+          AfterTargets="ResolveAssemblyReferences;ResolvePackageAssets">
+    <ItemGroup>
+      <ReferenceCopyLocalPaths Remove="@(ReferenceCopyLocalPaths)"
+                               Condition="'%(Filename)' == 'grpc_csharp_ext.%(UnusedNativeArch)'" />
+      <RuntimeCopyLocalItems Remove="@(RuntimeCopyLocalItems)"
+                             Condition="'%(Filename)' == 'grpc_csharp_ext.%(UnusedNativeArch)'" />
+      <NativeCopyLocalItems Remove="@(NativeCopyLocalItems)"
+                            Condition="'%(Filename)' == 'grpc_csharp_ext.%(UnusedNativeArch)'" />
+    </ItemGroup>
+  </Target>
+
+  <!-- Belt and braces: guarantees the result regardless of item-group naming. -->
+  <Target Name="_net48DeleteUnusedArchNatives" AfterTargets="Build">
+    <Delete Files="$(OutDir)grpc_csharp_ext.$(UnusedNativeArch).dll"
+            Condition="Exists('$(OutDir)grpc_csharp_ext.$(UnusedNativeArch).dll')" />
+  </Target>
+
+</Project>
