@@ -316,6 +316,7 @@ jobs:
           } else {
             Write-Host "  valid   $($f.Name)"
           }
+          Remove-Item $f.FullName -Force
         }
         if ($bad -gt 0) { throw "$bad of $count generated sing-box configurations were rejected" }
         Write-Host "all $count generated sing-box configurations accepted by sing-box $ver"
