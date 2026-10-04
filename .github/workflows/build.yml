@@ -42,12 +42,19 @@ jobs:
     - name: Verify publish output is runnable
       shell: pwsh
       run: |
-        $binDir = "v2rayN/v2rayN/bin/Release"
-
-        if (-not (Test-Path $binDir)) {
-          Write-Error "build output not found at $binDir"
+        # Locate the output rather than hardcoding it: the SDK nests it under a
+        # TFM folder (bin/Release/net48/), and that has already broken this check
+        # once. Asking the filesystem keeps it working if the layout changes.
+        $exe = Get-ChildItem -Path 'v2rayN/v2rayN/bin' -Recurse -Filter 'v2rayN.exe' -File -ErrorAction SilentlyContinue |
+               Select-Object -First 1
+        if (-not $exe) {
+          Write-Error "v2rayN.exe not found under v2rayN/v2rayN/bin"
+          Get-ChildItem -Path 'v2rayN/v2rayN/bin' -Recurse -Directory -ErrorAction SilentlyContinue |
+            Select-Object -ExpandProperty FullName
           exit 1
         }
+        $binDir = $exe.DirectoryName
+        Write-Host "publish output: $binDir"
 
         $required = @(
           'v2rayN.exe',
