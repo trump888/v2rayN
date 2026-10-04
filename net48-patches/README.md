@@ -221,6 +221,73 @@ So the pipeline fails loudly instead:
   swallow newlines and delete the closing `};` of an object initializer along
   with real code; that class of pattern is banned.
 
+## Windows 7 core updates
+
+Upstream hides Xray / mihomo / sing-box from the update page whenever
+`Environment.OSVersion.Version.Major < 10`, because the current builds are Go
+programs and Go 1.21 requires Windows 10 ("Go 1.20 is the last release that will
+run on any release of Windows 7, 8, Server 2008 and Server 2012").
+
+That is true of the *default* assets and wrong as an absolute. Two of the three
+projects still publish Win7-capable builds — they just are not the ones v2rayN
+asks for, because `CoreInfoManager` hardcodes the default asset names:
+
+| Core | Win7 asset | v2rayN asks for (upstream) |
+| --- | --- | --- |
+| sing-box | `sing-box-{ver}-windows-amd64-legacy-windows-7.zip` | `sing-box-{ver}-windows-amd64.zip` |
+| mihomo | `mihomo-windows-amd64-v1-go120-{ver}.zip` (`go120` = Go 1.20) | `mihomo-windows-amd64-v1-{ver}.zip` |
+| Xray | *none published* | `Xray-windows-64.zip` (now Go 1.27) |
+
+`ServiceLib/Common/Win7Compat.cs` swaps in the compat URLs on Windows 7 only and
+is a no-op on Windows 10/11, where upstream's own URLs still apply.
+
+Xray is different: it publishes one Windows zip per release and no compat
+variant, so the *tag* has to be pinned. Checked against each tag's `go.mod`:
+
+```
+v1.8.3 -> go 1.20   <- last release that runs on Windows 7
+v1.8.4 -> go 1.21   <- first release that requires Windows 10
+```
+
+The pin goes in `UpdateService.GetRemoteVersion`, not in `CoreInfo.LockedMaxVersion`.
+`LockedMaxVersion` resolves the tag by scanning the GitHub releases list, and
+`v1.8.3` sits about 81 entries back while GitHub serves 30 per page by default —
+the lock would silently stop finding it as Xray ships more releases. Returning
+the tag directly has no such dependency.
+
+Two supporting details:
+
+- `GetMihomoCoreExes()` also needs `mihomo-windows-amd64-v1-go120`, because the
+  go120 zip contains an exe named `mihomo-windows-amd64-v1-go120.exe`. sing-box
+  needs nothing: its Win7 zip holds a plain `sing-box.exe`.
+- mihomo embeds the tag **including the leading `v`** in its asset names
+  (`mihomo-windows-amd64-v1-v1.19.32.zip`) while sing-box strips it
+  (`sing-box-1.14.2-...`). `scripts/check-core-assets.sh` exists largely because
+  getting that backwards produced a convincing but wrong 404.
+
+### Keeping the asset names honest
+
+Those names belong to upstream. If a project renames or drops one, the port still
+compiles and the update page still lists all three cores — the failure only
+surfaces as a 404 at update time, on the machine that can least afford it.
+
+```bash
+./net48-patches/scripts/check-core-assets.sh
+```
+
+reads the release metadata and asserts each expected name is published. It runs
+in CI as an informational, non-blocking step (the network and upstream's release
+state should not be able to fail the build of the app itself). Exit codes: `0`
+all present, `1` an asset was renamed or dropped, `2` inconclusive because the
+GitHub API rate limit was hit — reported separately so a rate limit is never
+mistaken for a missing asset.
+
+**The trade-off, stated plainly:** pinning Xray to `v1.8.3` means the Xray on a
+Windows 7 install stays on an early-2024 build and misses every fix since,
+including security fixes. sing-box and mihomo track their latest releases
+normally. If that trade is wrong for a given deployment, drop the Xray arm of
+`Win7Compat` and let it stay hidden on Windows 7 as upstream does.
+
 ## Two bugs that only show up when you run it
 
 Neither is visible to `verify-local.sh`, and neither produces a build error. Both

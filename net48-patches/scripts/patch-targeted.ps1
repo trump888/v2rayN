@@ -308,6 +308,146 @@ if (Test-Path $globalUsings) {
 # that don't exist in 3.2.0 (will be done by compiler warnings; safe to skip)
 # ---------------------------------------------------------------------------
 
+# Patch 7: CoreInfoManager.cs — Windows 7 core updates
+#
+# Upstream hides all three cores on Windows < 10 because current builds need Go
+# 1.21+ (which requires Windows 10). That is true of the *default* assets, but
+# sing-box and mihomo still publish Win7-capable ones and Xray has a last
+# runnable tag. Win7Compat holds the details and the evidence.
+#
+# Each rewrite below asserts its anchor matched. A silent no-op here would look
+# exactly like "the update page is missing items again".
+# ---------------------------------------------------------------------------
+$coreInfoManager = Join-Path $SourceDir "ServiceLib/Manager/CoreInfoManager.cs"
+if (Test-Path $coreInfoManager) {
+    $content = Get-Content $coreInfoManager -Raw -Encoding UTF8
+
+    if ($content -notmatch 'Win7Compat') {
+
+        # 7a. Drop the Windows < 10 gate so the three cores are listed at all.
+        $gateOld = @'
+            if (!(Utils.IsWindows() && Environment.OSVersion.Version.Major < 10))
+            {
+                lst.Add(ECoreType.Xray);
+                lst.Add(ECoreType.mihomo);
+                lst.Add(ECoreType.sing_box);
+            }
+'@
+        $gateNew = @'
+            // net48 port: upstream skips these when OSVersion.Major < 10 because the
+            // current builds need Go 1.21+ (Windows 10 minimum). Win7Compat swaps in
+            // the Win7-capable assets and pins Xray, so list them everywhere.
+            lst.Add(ECoreType.Xray);
+            lst.Add(ECoreType.mihomo);
+            lst.Add(ECoreType.sing_box);
+'@
+        if ($content.Contains($gateOld)) {
+            $content = $content.Replace($gateOld, $gateNew)
+        } else {
+            throw "CoreInfoManager.cs: GetCheckUpdateCoreTypes gate not found - upstream refactored it"
+        }
+
+        # 7b. Xray: same asset name, different tag. The tag is applied in
+        #     UpdateService.GetRemoteVersion (Win7Compat.ShouldPinXray) because
+        #     that runs before the download URL is formatted.
+        $xrayOld = '                    DownloadUrlWin64 = urlXray + "/download/{0}/Xray-windows-64.zip",'
+        $xrayNew = '                    DownloadUrlWin64 = Win7Compat.XrayDownloadUrl(urlXray),'
+        if ($content.Contains($xrayOld)) {
+            $content = $content.Replace($xrayOld, $xrayNew)
+        } else {
+            throw "CoreInfoManager.cs: Xray DownloadUrlWin64 not found - upstream refactored it"
+        }
+
+        # 7c. mihomo: the Win7 asset is the Go 1.20 build, named
+        #     mihomo-windows-amd64-v1-go120-{ver}.zip (it keeps the -v1- infix).
+        $mihomoOld = '                    DownloadUrlWin64 = urlMihomo + "/download/{0}/mihomo-windows-amd64-v1-{0}.zip",'
+        $mihomoNew = '                    DownloadUrlWin64 = Win7Compat.MihomoDownloadUrl(urlMihomo),'
+        if ($content.Contains($mihomoOld)) {
+            $content = $content.Replace($mihomoOld, $mihomoNew)
+        } else {
+            throw "CoreInfoManager.cs: mihomo DownloadUrlWin64 not found - upstream refactored it"
+        }
+
+        # 7d. sing-box: the Win7 asset carries a -legacy-windows-7 suffix.
+        $singboxOld = '                    DownloadUrlWin64 = urlSingbox + "/download/{0}/sing-box-{1}-windows-amd64.zip",'
+        $singboxNew = '                    DownloadUrlWin64 = Win7Compat.SingBoxDownloadUrl(urlSingbox),'
+        if ($content.Contains($singboxOld)) {
+            $content = $content.Replace($singboxOld, $singboxNew)
+        } else {
+            throw "CoreInfoManager.cs: sing-box DownloadUrlWin64 not found - upstream refactored it"
+        }
+
+        # 7e. The mihomo go120 zip contains mihomo-windows-amd64-v1-go120.exe, so
+        #     GetCoreExecFile has to know that name or the binary is never found.
+        #     Added after the regular v1 entry so an existing install keeps winning.
+        $exeOld = '            names.Add("mihomo-windows-amd64-v1");'
+        $exeNew = @'
+            names.Add("mihomo-windows-amd64-v1");
+            // net48 port: exe name inside the Win7 (go120) mihomo zip.
+            names.Add(Win7Compat.MihomoWin7Exe);
+'@
+        if ($content.Contains($exeOld)) {
+            $content = $content.Replace($exeOld, $exeNew)
+        } else {
+            throw "CoreInfoManager.cs: GetMihomoCoreExes windows list not found - upstream refactored it"
+        }
+
+        [System.IO.File]::WriteAllText($coreInfoManager, $content, [System.Text.UTF8Encoding]::new($false))
+        Write-Host "  > Patched CoreInfoManager.cs (Win7 core updates)" -ForegroundColor Green
+    } else {
+        Write-Host "  > Already patched: CoreInfoManager.cs"
+    }
+}
+
+# ---------------------------------------------------------------------------
+# Patch 8: UpdateService.cs — pin Xray's tag on Windows 7
+#
+# v2rayN resolves the release tag first (GetRemoteVersion) and only then formats
+# the download URL with it, so overriding the URL alone cannot pin a version --
+# the tag would still come from GitHub's latest release. Short-circuiting here
+# returns v1.8.3, after which ParseDownloadUrl builds
+# .../download/v1.8.3/Xray-windows-64.zip.
+#
+# Note this deliberately does not use CoreInfo.LockedMaxVersion: that resolves
+# the tag by scanning the GitHub releases list, and v1.8.3 sits ~81 entries back
+# (GitHub serves 30 per page by default), so the lock would silently stop
+# finding it as Xray ships more releases.
+# ---------------------------------------------------------------------------
+$updateService = Join-Path $SourceDir "ServiceLib/Services/UpdateService.cs"
+if (Test-Path $updateService) {
+    $content = Get-Content $updateService -Raw -Encoding UTF8
+
+    if ($content -notmatch 'Win7Compat\.ShouldPinXray') {
+
+        $anchor = @'
+        var coreInfo = CoreInfoManager.Instance.GetCoreInfo(type);
+        var tagName = string.Empty;
+        if (preRelease || coreInfo?.LockedMaxVersion != null)
+'@
+        $replacement = @'
+        var coreInfo = CoreInfoManager.Instance.GetCoreInfo(type);
+        var tagName = string.Empty;
+        // net48 port: on Windows 7 the latest Xray is built with Go 1.27 and
+        // cannot start, so pin the last Go 1.20 release. Has to happen here,
+        // before the tag is used to build the download URL.
+        if (Win7Compat.ShouldPinXray(type))
+        {
+            return new UpdateResult(true, new SemanticVersion(Win7Compat.XrayLastWin7Tag));
+        }
+        if (preRelease || coreInfo?.LockedMaxVersion != null)
+'@
+        if ($content.Contains($anchor)) {
+            $content = $content.Replace($anchor, $replacement)
+            [System.IO.File]::WriteAllText($updateService, $content, [System.Text.UTF8Encoding]::new($false))
+            Write-Host "  > Patched UpdateService.cs (Xray v1.8.3 pin on Win7)" -ForegroundColor Green
+        } else {
+            throw "UpdateService.cs: GetRemoteVersion anchor not found - upstream refactored it"
+        }
+    } else {
+        Write-Host "  > Already patched: UpdateService.cs"
+    }
+}
+
 Write-Host "  Targeted patches applied"
 
 if ($script:Unhandled.Count -gt 0) {

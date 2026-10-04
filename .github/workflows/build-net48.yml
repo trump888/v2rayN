@@ -366,6 +366,22 @@ jobs:
 
           Write-Host "publish output verified: $($required.Count) required files present, $($managed.Count) managed assemblies bind, redirects OK"
 
+      # Does upstream still publish the core assets the Windows 7 support in
+      # Win7Compat.cs asks for? Those names belong to upstream, so a rename
+      # would not fail the build above -- it would surface as a 404 when a user
+      # on Windows 7 tries to update a core. Non-blocking on purpose: it depends
+      # on the network and on upstream's release state, neither of which should
+      # be able to fail the build of the app itself. Exit 2 means "inconclusive
+      # (rate limited)"; read the step log either way.
+      - name: Check core download assets (informational)
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          bash ./net48-patches/scripts/check-core-assets.sh
+          if ($LASTEXITCODE -ne 0) {
+            Write-Warning "check-core-assets.sh exited $LASTEXITCODE (1 = an asset name changed upstream, 2 = GitHub API rate limited). The net48 build itself is unaffected."
+          }
+
       - name: Collect build outputs
         shell: pwsh
         run: |

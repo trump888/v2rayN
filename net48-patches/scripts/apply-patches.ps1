@@ -138,6 +138,9 @@ $shims = @(
     @{ Src = "shims/BclPolyfills3.cs";             Dst = "ServiceLib/Common/BclPolyfills3.cs" }
     @{ Src = "shims/BclNet6Polyfills.cs";          Dst = "ServiceLib/Common/BclNet6Polyfills.cs" }
     @{ Src = "shims/TarPolyfills.cs";             Dst = "ServiceLib/Common/TarPolyfills.cs" }
+    # Not a polyfill: Windows 7 core-update compatibility (Go 1.20 asset names
+    # plus the Xray v1.8.3 tag pin). Evidence is in the file's header.
+    @{ Src = "shims/Win7Compat.cs";                Dst = "ServiceLib/Common/Win7Compat.cs" }
     @{ Src = "shims/BinaryPrimitives.cs";          Dst = "ServiceLib.UdpTest/BinaryPrimitives.cs" }
     # WPF-specific polyfills (only for v2rayN project, not AmazTool)
     @{ Src = "shims/WpfPolyfills.cs";              Dst = "v2rayN/WpfPolyfills.cs" }
