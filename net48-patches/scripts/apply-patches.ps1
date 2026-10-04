@@ -67,6 +67,25 @@ if (Test-Path $desktopDir) {
 # ---------------------------------------------------------------------------
 Write-Section "Step 2: Patch engineering files"
 
+# Read the pristine upstream version BEFORE the overwrite below: the port's
+# Directory.Build.props is a whole-file replacement, so it clobbers upstream's
+# <Version>. Leaving a literal in the patch meant every build of every upstream
+# release reported the same stale number (it said 7.24.4 while upstream was on
+# 7.25.4). Capturing it here is what lets a new upstream release land with no
+# edit to this file.
+$upstreamVersion = $null
+$pristineBuildProps = Join-Path $SourceDir "Directory.Build.props"
+if (Test-Path $pristineBuildProps) {
+    $pristineText = Get-Content $pristineBuildProps -Raw
+    if ($pristineText -match '<Version>\s*([^<]+?)\s*</Version>') {
+        $upstreamVersion = $Matches[1]
+    }
+}
+if (-not $upstreamVersion) {
+    $upstreamVersion = 'unknown'
+    Write-Warn "Could not read <Version> from $pristineBuildProps"
+}
+
 $filesToCopy = @(
     @{ Src = "patches/Directory.Build.props";    Dst = "Directory.Build.props" }
     @{ Src = "patches/Directory.Packages.props"; Dst = "Directory.Packages.props" }
@@ -82,6 +101,24 @@ foreach ($f in $filesToCopy) {
     Write-Step "Copy $($f.Src) -> $($f.Dst)"
     Copy-Item $src $dst -Force
 }
+
+# ---------------------------------------------------------------------------
+# Step 2b: Stamp the captured upstream version into the port's build props.
+# ---------------------------------------------------------------------------
+Write-Section "Step 2b: Stamp upstream version into Directory.Build.props"
+
+$portBuildProps = Join-Path $SourceDir "Directory.Build.props"
+$portBuildPropsText = Get-Content $portBuildProps -Raw
+$stampedVersion = "$upstreamVersion-net48"
+
+if ($portBuildPropsText -match '<Version>[^<]*</Version>') {
+    $portBuildPropsText = $portBuildPropsText -replace '<Version>[^<]*</Version>', "<Version>$stampedVersion</Version>"
+}
+else {
+    $portBuildPropsText = $portBuildPropsText -replace '(<PropertyGroup>)', "<PropertyGroup>`r`n        <Version>$stampedVersion</Version>"
+}
+Set-Content -Path $portBuildProps -Value $portBuildPropsText -NoNewline
+Write-Step "Version stamped: $stampedVersion"
 
 # ---------------------------------------------------------------------------
 # Step 3: Drop shim files
@@ -104,8 +141,16 @@ $shims = @(
     @{ Src = "shims/BinaryPrimitives.cs";          Dst = "ServiceLib.UdpTest/BinaryPrimitives.cs" }
     # WPF-specific polyfills (only for v2rayN project, not AmazTool)
     @{ Src = "shims/WpfPolyfills.cs";              Dst = "v2rayN/WpfPolyfills.cs" }
-    @{ Src = "shims/Lock.cs";                      Dst = "v2rayN/Lock.cs" }
     @{ Src = "shims/CodeAnalysisNullability.cs";   Dst = "v2rayN/CodeAnalysisNullability.cs" }
+    # v2rayN needs IsExternalInit even though none of its own sources use `init`
+    # or records: ReactiveUI.SourceGenerators emits the `[Reactive]` partial
+    # properties as `init` accessors, and `init` needs the predefined
+    # IsExternalInit type in *the compiling assembly*. ServiceLib's copy is
+    # internal, so it is not visible here -> CS0518.
+    @{ Src = "shims/IsExternalInit.cs";            Dst = "v2rayN/IsExternalInit.cs" }
+    # NOTE: v2rayN/Lock.cs is deliberately NOT installed. No v2rayN source
+    # references Lock, and ServiceLib already exposes a public one, so a local
+    # copy only produced CS0436 ("conflicts with the imported type 'Lock'").
     # AmazTool only needs basic polyfills (no CliWrap, no ReactiveUI, no X509)
     @{ Src = "shims/BclPolyfills.cs";              Dst = "AmazTool/BclPolyfills.cs" }
     @{ Src = "shims/BclPolyfills2.cs";             Dst = "AmazTool/BclPolyfills2.cs" }
@@ -123,6 +168,9 @@ $obsoleteShims = @(
     # TaskpoolScheduler) and no longer depends on the System.Reactive package,
     # so the hand-rolled replacement both duplicates and breaks.
     @{ Path = "ServiceLib/Common/RxSchedulers.cs"; Reason = "built into ReactiveUI 24.x" }
+    # No v2rayN source references Lock and ServiceLib already exposes a public
+    # one, so a local copy only warned CS0436 on every build.
+    @{ Path = "v2rayN/Lock.cs"; Reason = "unused; conflicts with ServiceLib's public Lock (CS0436)" }
 )
 foreach ($o in $obsoleteShims) {
     $p = Join-Path $SourceDir $o.Path
