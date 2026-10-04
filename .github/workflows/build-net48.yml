@@ -309,13 +309,24 @@ jobs:
             Write-Host "  $k -> $($redirects[$k] -join ', ')"
           }
 
+          Write-Host "----- begin v2rayN.exe.config -----"
+          Write-Host $cfgText
+          Write-Host "----- end v2rayN.exe.config -----"
+
           $managed = @()
           $shippedVersions = @{}
+          $shippedTokens = @{}
           foreach ($dll in Get-ChildItem $binDir -Filter *.dll) {
             $refs = Get-AssemblyRefs $dll.FullName
             if ($null -eq $refs) { continue }          # not a managed assembly
             $managed += $dll
-            try { $shippedVersions[$dll.BaseName] = [System.Reflection.AssemblyName]::GetAssemblyName($dll.FullName).Version.ToString() }
+            try {
+              $an = [System.Reflection.AssemblyName]::GetAssemblyName($dll.FullName)
+              $shippedVersions[$dll.BaseName] = $an.Version.ToString()
+              $tok = $an.GetPublicKeyToken()
+              $shippedTokens[$dll.BaseName] =
+                if ($null -eq $tok -or $tok.Length -eq 0) { '' } else { [System.BitConverter]::ToString($tok).Replace('-','').ToLowerInvariant() }
+            }
             catch { continue }
           }
 
@@ -325,9 +336,14 @@ jobs:
             foreach ($name in $refs.Keys) {
               if (-not $shippedVersions.ContainsKey($name)) { continue }
               if ($refs[$name] -eq $shippedVersions[$name]) { continue }
-              # a redirect pointing at the shipped version resolves the difference
+              # A redirect pointing at the shipped version resolves the difference.
               if ($redirects.ContainsKey($name) -and ($redirects[$name] -contains $shippedVersions[$name])) { continue }
-              $unresolved += "$($dll.Name) references $name $($refs[$name]) but $($shippedVersions[$name]) is shipped, with no binding redirect"
+              # Only strong-named assemblies actually need one. The loader binds
+              # simple-name assemblies by name alone and ignores the version, so
+              # the ReactiveUI 7.0.0.0 -> 8.0.0.0 skew (those assemblies ship with
+              # an empty public key token) binds fine and must not be flagged.
+              if ($shippedTokens[$name] -eq '') { continue }
+              $unresolved += "$($dll.Name) references $name $($refs[$name]) but $($shippedVersions[$name]) is shipped (strong-named), with no binding redirect"
             }
           }
           if ($unresolved) {
