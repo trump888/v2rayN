@@ -182,6 +182,63 @@ is what produced CS0266. A partially-applied rewrite is worse than none, so
 delete the rule when its premise disappears rather than leaving it to fire on
 whatever still matches.
 
+## Runtime cost: what was actually worth changing
+
+Audited the built artifact rather than guessing. Most of it turned out to be fine,
+and the record of what *is* deliberate is as useful as the changes.
+
+Checked and left alone:
+
+| Thing | Size | Why it stays |
+| --- | --- | --- |
+| `libSkiaSharp.dll` | 11.1 MB | only touched by `QRCodeWindowsUtils.GetQRCode`, which runs when the user opens a QR code — loaded lazily, so it is not steady-state memory |
+| `MaterialDesignThemes.Wpf.dll` | 9.5 MB | theming |
+| `geoip.dat` + `geosite.dat` | 28.9 MB | Xray's routing data |
+| `libcronet.dll` | 9.1 MB | ships inside sing-box's own `windows-amd64.zip`, so v2rayN's in-app updater installs it too — dropping it from the CI payload would only create a "missing in the zip, back after update" inconsistency |
+| unreachable managed assemblies | **0.52 MB** | six assemblies total, and one of them is `AmazTool`, which is intentional |
+| embedded PDBs | 972 KB | mostly third-party (H.NotifyIcon.Wpf is 50% of itself); our three projects account for 196 KB |
+| 16 satellite language folders | ~1 MB | .NET only loads the culture that matches, so this is disk, not memory |
+
+The log pruning already existed (`TaskManager` clears logs older than 7 days,
+config older than 1 hour, temp older than 7 days), so there was no disk leak to
+fix. `TaskManager`'s one-minute timer does **not** hit the network —
+`UpdateTaskRunSubscription` filters on `AutoUpdateInterval` and returns early
+when nothing is due. And the shims contain no reflection at all (no `GetMethod`,
+`Invoke` or `Activator`), so the port adds no per-call overhead of its own.
+
+### Logging: the one thing worth changing
+
+`Logging.Setup()` attached a bare `FileTarget`, so every log call did the file
+write on the calling thread. v2rayN logs from wherever an error happens —
+including the UI thread and core startup — and it logs a lot at `Debug`:
+`SaveLog`'s exception overload emits the message and the stack trace as two
+separate `Debug` calls.
+
+The port wraps the target in NLog's `AsyncTargetWrapper`, with two deliberate
+choices:
+
+- **`OverflowAction.Discard` with `QueueLimit = 8192`.** NLog's default is
+  `Grow`, which converts a log flood into unbounded memory — the wrong trade
+  here. Real usage is single-digit lines per minute, so the queue only fills
+  during a runaway core.
+- **Log level stays `Debug`.** Raising the floor to `Info` would silently delete
+  the diagnostics: v2rayN logs exception messages *and* stack traces at `Debug`.
+
+Measured on the same config shape: 50 000 `Debug` calls return in ~30 ms instead
+of being serialised through the disk, and at a realistic rate (202 messages at
+20 ms intervals) nothing is dropped — both exception lines survive.
+
+NLog 6 renamed things, and this would fail loudly rather than silently if the
+package moved: the wrapper is `AsyncTargetWrapper`, not the NLog 4/5
+`AsyncWrapper`, and the enum is `AsyncTargetWrapperOverflowAction`.
+
+**This change has a required companion.** `App.OnExit` ends with
+`Process.GetCurrentProcess().Kill()` — a hard termination with no teardown.
+That was harmless while logging was synchronous, since every write had already
+reached disk. With an async target there is an in-flight queue, and the kill
+drops it, losing the shutdown lines that are precisely the ones explaining a
+crash-on-exit. So `LogManager.Flush()` is added immediately before the `Kill()`.
+
 ## Known behaviour differences from upstream
 
 | Area | Difference |

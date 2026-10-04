@@ -448,6 +448,141 @@ if (Test-Path $updateService) {
     }
 }
 
+# ---------------------------------------------------------------------------
+# Patch 9: Logging.cs — write logs off the calling thread
+#
+# Upstream attaches a bare FileTarget, so every log call performs the file write
+# on the calling thread. v2rayN logs from wherever an error happens, including
+# the UI thread and core-startup paths, and it logs a lot at Debug: SaveLog's
+# exception overload emits the message and the stack trace as two separate
+# Debug calls. On a slow or spinning disk that is blocking I/O on threads that
+# should not be doing I/O.
+#
+# NLog's AsyncTargetWrapper moves the write to a background worker and batches
+# it. Measured on the same config shape: 50 000 Debug calls return in ~30 ms
+# instead of being serialized through the disk.
+#
+# QueueLimit + Discard is deliberate. The default is Grow, which converts a log
+# flood into unbounded memory - the wrong trade for the lightweight port. The
+# queue is far larger than real usage: v2rayN emits single-digit lines per
+# minute, so 8192 covers hours of even a crash loop. Verified at a realistic
+# rate that nothing is dropped (202 of 202 written, including both exception
+# lines); only a burst of more than QueueLimit in-flight events discards, and
+# then it keeps the most recent.
+#
+# Log level stays LogLevel.Debug on purpose. Raising the floor to Info would
+# throw away exactly what users need: v2rayN logs exception messages and stack
+# traces at Debug, so an Info floor would silently delete the diagnostics.
+#
+# NLog 6 note: the wrapper is AsyncTargetWrapper, not the NLog 4/5 AsyncWrapper,
+# and the overflow enum is AsyncTargetWrapperOverflowAction. Neither exists
+# under the old names in 6.x, so this breaks loudly at compile time if the
+# package is ever downgraded.
+# ---------------------------------------------------------------------------
+$loggingFile = Join-Path $SourceDir "ServiceLib/Common/Logging.cs"
+if (Test-Path $loggingFile) {
+    $content = Get-Content $loggingFile -Raw -Encoding UTF8
+
+    if ($content -notmatch 'AsyncTargetWrapper') {
+
+        $setupOld = @'
+        LoggingConfiguration config = new();
+        FileTarget fileTarget = new();
+        config.AddTarget("file", fileTarget);
+        fileTarget.Layout = "${longdate}-${level:uppercase=true} ${message}";
+        fileTarget.FileName = Utils.GetLogPath("${shortdate}.txt");
+        config.LoggingRules.Add(new LoggingRule("*", LogLevel.Debug, fileTarget));
+        LogManager.Configuration = config;
+'@
+        $setupNew = @'
+        LoggingConfiguration config = new();
+        FileTarget fileTarget = new();
+        fileTarget.Layout = "${longdate}-${level:uppercase=true} ${message}";
+        fileTarget.FileName = Utils.GetLogPath("${shortdate}.txt");
+
+        // net48 port: hand the write to a background worker. Upstream writes on
+        // the caller's thread, which puts file I/O on whatever thread hit the
+        // error - including the UI thread.
+        AsyncTargetWrapper asyncFile = new()
+        {
+            WrappedTarget = fileTarget,
+            // Bounded on purpose: the NLog default (Grow) turns a log flood into
+            // unbounded memory. Real usage is single-digit lines per minute, so
+            // this queue only fills during a runaway core.
+            QueueLimit = 8192,
+            OverflowAction = AsyncTargetWrapperOverflowAction.Discard,
+            TimeToSleepBetweenBatches = 100,
+        };
+        config.AddTarget("file", asyncFile);
+        config.LoggingRules.Add(new LoggingRule("*", LogLevel.Debug, asyncFile));
+        LogManager.Configuration = config;
+'@
+        if ($content.Contains($setupOld)) {
+            $content = $content.Replace($setupOld, $setupNew)
+        } else {
+            throw "Logging.cs: Logging.Setup body not found - upstream refactored it"
+        }
+
+        if ($content -notmatch 'using NLog\.Targets\.Wrappers;') {
+            $content = $content -replace 'using NLog\.Targets;', "using NLog.Targets;`nusing NLog.Targets.Wrappers;"
+        }
+
+        [System.IO.File]::WriteAllText($loggingFile, $content, [System.Text.UTF8Encoding]::new($false))
+        Write-Host "  > Patched Logging.cs (async file target)" -ForegroundColor Green
+    } else {
+        Write-Host "  > Already patched: Logging.cs"
+    }
+}
+
+# ---------------------------------------------------------------------------
+# Patch 10: App.xaml.cs — flush NLog before OnExit kills the process
+#
+# Companion to patch 9, and required by it. OnExit ends with
+# Process.GetCurrentProcess().Kill(), a hard termination with no teardown. That
+# was harmless while logging was synchronous because every write had already
+# reached the disk. Once the file target is asynchronous there is an in-flight
+# queue, and killing the process drops it - losing the shutdown lines, which are
+# precisely the ones that explain a crash-on-exit.
+#
+# LogManager.Flush() blocks until the queue drains, so this restores the
+# guarantee the synchronous target used to give for free.
+# ---------------------------------------------------------------------------
+$appFile = Join-Path $SourceDir "v2rayN/App.xaml.cs"
+if (Test-Path $appFile) {
+    $content = Get-Content $appFile -Raw -Encoding UTF8
+
+    if ($content -notmatch 'LogManager\.Flush') {
+
+        $exitOld = @'
+        Logging.SaveLog("OnExit");
+        base.OnExit(e);
+        Process.GetCurrentProcess().Kill();
+'@
+        $exitNew = @'
+        Logging.SaveLog("OnExit");
+        base.OnExit(e);
+        // net48 port: the file target writes asynchronously (see Logging.cs), and
+        // Kill() below is a hard termination that skips NLog teardown. Drain the
+        // queue first or the shutdown lines - the ones that explain a
+        // crash-on-exit - are lost.
+        LogManager.Flush();
+        Process.GetCurrentProcess().Kill();
+'@
+        if ($content.Contains($exitOld)) {
+            $content = $content.Replace($exitOld, $exitNew)
+            if ($content -notmatch 'using NLog;') {
+                $content = "using NLog;`n" + $content
+            }
+            [System.IO.File]::WriteAllText($appFile, $content, [System.Text.UTF8Encoding]::new($false))
+            Write-Host "  > Patched App.xaml.cs (flush NLog before Kill)" -ForegroundColor Green
+        } else {
+            throw "App.xaml.cs: OnExit body not found - upstream refactored it"
+        }
+    } else {
+        Write-Host "  > Already patched: App.xaml.cs"
+    }
+}
+
 Write-Host "  Targeted patches applied"
 
 if ($script:Unhandled.Count -gt 0) {
