@@ -1,0 +1,11 @@
+{
+  "inbounds": [ { "type": "mixed", "listen": "127.0.0.1", "listen_port": 2080 } ],
+  "outbounds": [
+    { "type": "direct", "tag": "direct",
+      "masque": { "type": "masque-client", "tag": "mq", "server": "example.com", "server_port": 443,
+                  "username": "u", "password": "p",
+                  "tls": { "enabled": true, "server_name": "example.com" } } },
+    { "type": "block", "tag": "block" }
+  ],
+  "route": { "rules": [ { "protocol": "quic", "masque": "mq" } ] }
+}

@@ -101,6 +101,9 @@ namespace v2rayN.Handler
                     case EConfigType.AnyTLS:
                         url = ShareAnyTLS(item);
                         break;
+                    case EConfigType.Naive:
+                        url = ShareNaive(item);
+                        break;
                     case EConfigType.Mieru:
                         url = ShareMieru(item);
                         break;
@@ -311,6 +314,41 @@ namespace v2rayN.Handler
             GetIpv6(item.address),
             item.port);
             url = $"{Global.anytlsProtocol}{url}{query}{remark}";
+            return url;
+        }
+
+        private static string ShareNaive(VmessItem item)
+        {
+            string remark = string.Empty;
+            if (!Utils.IsNullOrEmpty(item.remarks))
+            {
+                remark = "#" + Utils.UrlEncode(item.remarks);
+            }
+
+            var dicQuery = new Dictionary<string, string>();
+            if (!Utils.IsNullOrEmpty(item.sni))
+            {
+                dicQuery["sni"] = item.sni;
+            }
+            if (!Utils.IsNullOrEmpty(item.fingerprint))
+            {
+                dicQuery["fingerprint"] = item.fingerprint;
+            }
+            if (!Utils.IsNullOrEmpty(item.allowInsecure))
+            {
+                dicQuery["insecure"] = item.allowInsecure;
+            }
+
+            string query = dicQuery.Count > 0 ? "?" + string.Join("&", dicQuery.Select(x => x.Key + "=" + x.Value).ToArray()) : "";
+
+            // naive+https://<userinfo>@<host>:<port>[?query][#remark]
+            // userinfo is "user:pass" or just "pass"; the generator splits it the
+            // same way, so no extra model field is needed.
+            url = string.Format("{0}@{1}:{2}",
+            Utils.UrlEncode(item.id),
+            GetIpv6(item.address),
+            item.port);
+            url = $"{Global.naiveProtocol}{url}{query}{remark}";
             return url;
         }
 
@@ -551,6 +589,16 @@ namespace v2rayN.Handler
                     Utils.SaveLog($"Try parse hysteria2: {result.Substring(0, Math.Min(100, result.Length))}");
                     vmessItem = ResolveHysteria2(result);
                     Utils.SaveLog($"ResolveHysteria2 result: {vmessItem == null}");
+                    if (vmessItem == null)
+                    {
+                        msg = ResUI.ConfigurationFormatIncorrect;
+                        return null;
+                    }
+                }
+                else if (result.StartsWith(Global.naiveProtocol) || result.StartsWith(Global.naiveQuicProtocol))
+                {
+                    Utils.SaveLog($"Try parse naive: {result.Substring(0, Math.Min(100, result.Length))}");
+                    vmessItem = ResolveNaive(result);
                     if (vmessItem == null)
                     {
                         msg = ResUI.ConfigurationFormatIncorrect;
@@ -987,6 +1035,35 @@ namespace v2rayN.Handler
             item.security = query["encryption"] ?? "none";
             item.streamSecurity = query["security"] ?? "";
             ResolveStdTransport(query, ref item);
+
+            return item;
+        }
+
+        private static VmessItem ResolveNaive(string result)
+        {
+            VmessItem item = new VmessItem
+            {
+                configType = EConfigType.Naive
+            };
+
+            // Both the https and quic spellings parse the same way; only the
+            // transport differs, and this port generates the https form.
+            var url = TryParseUri(result, Global.naiveProtocol) ?? TryParseUri(result, Global.naiveQuicProtocol);
+            if (url == null) return null;
+
+            item.address = url.IdnHost;
+            item.port = url.Port;
+            item.remarks = url.GetComponents(UriComponents.Fragment, UriFormat.Unescaped);
+            // Kept whole, as "user:pass" or just "pass". Split at generation time.
+            item.id = Utils.UrlDecode(url.UserInfo);
+
+            var query = HttpUtility.ParseQueryString(url.Query);
+            item.sni = query["sni"] ?? "";
+            item.fingerprint = query["fingerprint"] ?? "";
+            if (query["insecure"] != null)
+            {
+                item.allowInsecure = query["insecure"];
+            }
 
             return item;
         }

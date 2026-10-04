@@ -37,7 +37,8 @@ namespace v2rayN.Forms
             // AnyTLS joins this list because it uses the same yPos-driven dynamic
             // controls on panVmess. It only differs in which ones it adds.
             if (eConfigType == EConfigType.Hysteria2 || eConfigType == EConfigType.Mieru
-                || eConfigType == EConfigType.TUIC || eConfigType == EConfigType.AnyTLS)
+                || eConfigType == EConfigType.TUIC || eConfigType == EConfigType.AnyTLS
+                || eConfigType == EConfigType.Naive)
             {
                 int yPos = 120;
 
@@ -104,7 +105,7 @@ namespace v2rayN.Forms
                     panVmess.Controls.Add(txtObfsPassword);
                 }
 
-                if (eConfigType == EConfigType.AnyTLS)
+                if (eConfigType == EConfigType.AnyTLS || eConfigType == EConfigType.Naive)
                 {
                     // Only the three fields the sing-box generator and the
                     // anytls:// share link actually use. The shared sni /
@@ -118,7 +119,7 @@ namespace v2rayN.Forms
                     panVmess.Controls.Add(lblSni);
 
                     txtSni = new TextBox();
-                    txtSni.Name = "txtAnyTlsSni";
+                    txtSni.Name = "txtProtocolSni";
                     txtSni.Location = new System.Drawing.Point(85, yPos - 3);
                     txtSni.Size = new System.Drawing.Size(250, 20);
                     panVmess.Controls.Add(txtSni);
@@ -131,7 +132,7 @@ namespace v2rayN.Forms
                     panVmess.Controls.Add(lblFingerprint);
 
                     cmbFingerprint = new ComboBox();
-                    cmbFingerprint.Name = "cmbAnyTlsFingerprint";
+                    cmbFingerprint.Name = "cmbProtocolFingerprint";
                     cmbFingerprint.Location = new System.Drawing.Point(85, yPos - 3);
                     cmbFingerprint.Size = new System.Drawing.Size(150, 20);
                     cmbFingerprint.Items.AddRange(new object[] { "", "chrome", "firefox", "safari", "ios", "android", "edge", "random", "360", "qq" });
@@ -139,7 +140,7 @@ namespace v2rayN.Forms
 
                     yPos += 25;
                     chkAllowInsecure = new CheckBox();
-                    chkAllowInsecure.Name = "chkAnyTlsInsecure";
+                    chkAllowInsecure.Name = "chkProtocolInsecure";
                     chkAllowInsecure.Text = "Allow Insecure";
                     chkAllowInsecure.Location = new System.Drawing.Point(85, yPos - 3);
                     chkAllowInsecure.Size = new System.Drawing.Size(120, 20);
@@ -214,6 +215,7 @@ namespace v2rayN.Forms
                 case EConfigType.Mieru:
                 case EConfigType.TUIC:
                 case EConfigType.AnyTLS:
+                case EConfigType.Naive:
                     panVmess.Dock = DockStyle.Fill;
                     panVmess.Visible = true;
                     break;
@@ -267,6 +269,7 @@ namespace v2rayN.Forms
                     cmbFlow6.Text = vmessItem.flow;
                     break;
                 case EConfigType.AnyTLS:
+                case EConfigType.Naive:
                     txtId.Text = vmessItem.id;
                     if (txtSni != null) txtSni.Text = vmessItem.sni ?? "";
                     if (cmbFingerprint != null) cmbFingerprint.Text = vmessItem.fingerprint ?? "";
@@ -366,6 +369,7 @@ namespace v2rayN.Forms
                 case EConfigType.Mieru:
                 case EConfigType.TUIC:
                 case EConfigType.AnyTLS:
+                case EConfigType.Naive:
                     id = txtId.Text;
                     break;
             }
@@ -433,7 +437,7 @@ namespace v2rayN.Forms
                 if (txtCertSha256 != null)
                     vmessItem.certSha256 = txtCertSha256.Text;
             }
-            if (eConfigType == EConfigType.AnyTLS)
+            if (eConfigType == EConfigType.AnyTLS || eConfigType == EConfigType.Naive)
             {
                 if (txtSni != null) vmessItem.sni = txtSni.Text;
                 if (cmbFingerprint != null) vmessItem.fingerprint = cmbFingerprint.Text;
@@ -467,6 +471,7 @@ namespace v2rayN.Forms
                 case EConfigType.Mieru:
                 case EConfigType.TUIC:
                 case EConfigType.AnyTLS:
+                case EConfigType.Naive:
                     ret = ConfigHandler.AddServer(ref config, vmessItem);
                     break;
             }

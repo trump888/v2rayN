@@ -50,6 +50,8 @@ namespace SingboxConfigCheck
             Console.WriteLine("== share link round-trip ==");
             RoundTrip(outDir);
 
+            NaiveRoundTrip(outDir);
+
             Console.WriteLine();
             Console.WriteLine("== routing ==");
             Routing();
@@ -158,6 +160,48 @@ namespace SingboxConfigCheck
         }
 
         /// <summary>
+        /// Naive, whose credential is the whole userinfo: "user:pass" or just
+        /// "pass". The generator splits it rather than the model gaining a username
+        /// field, matching 7.x's NaiveFmt.
+        /// </summary>
+        private static void NaiveRoundTrip(string outDir)
+        {
+            Console.WriteLine();
+            Console.WriteLine("== naive ==");
+
+            foreach (var (label, link, expectedUser, expectedPass) in new[]
+            {
+                ("user+pass", "naive+https://alice:s3cr%40t@example.com:443?sni=cdn.example.org&insecure=1#N1", "alice", "s3cr@t"),
+                ("pass-only", "naive+https://onlypass@example.com:443#N2", null, "onlypass"),
+                ("quic form", "naive+quic://bob:pw@example.com:443#N3", "bob", "pw"),
+            })
+            {
+                var item = ShareHandler.ImportFromClipboardConfig(link, out _);
+                Check(item != null, $"naive ({label}) imports");
+                if (item == null) { continue; }
+                Check(item.configType == EConfigType.Naive, $"naive ({label}) type is Naive");
+                Check(item.address == "example.com" && item.port == 443, $"naive ({label}) address/port");
+
+                var file = Path.Combine(outDir, "naive-" + label.Replace('+', '-') + ".json");
+                var rc = V2rayConfigHandler.GenerateClientConfig(item, file, out var msg, out _);
+                Check(rc == 0, $"naive ({label}) generates (msg: {msg})");
+                if (rc != 0 || !File.Exists(file)) { continue; }
+
+                var json = File.ReadAllText(file);
+                Check(json.Contains("\"type\": \"naive\""), $"naive ({label}) emits a naive outbound");
+                if (expectedUser != null)
+                {
+                    Check(json.Contains($"\"username\": \"{expectedUser}\""), $"naive ({label}) splits username '{expectedUser}'");
+                }
+                else
+                {
+                    Check(!json.Contains("\"username\""), $"naive ({label}) omits username when none was given");
+                }
+                Check(json.Contains($"\"password\": \"{expectedPass.Replace("@", "@")}\""), $"naive ({label}) sets password '{expectedPass}'");
+            }
+        }
+
+        /// <summary>
         /// The WinForms dialog, exercised for real. A Windows runner can construct
         /// WinForms without an interactive desktop, so this is not eyeballing a
         /// screenshot: it drives the same code paths the user does.
@@ -196,14 +240,14 @@ namespace SingboxConfigCheck
                 Check(f.Controls.Count > 0, "form has controls after Load");
 
                 // AnyTLS-specific controls, created dynamically by AddNewProtocolControls.
-                var sni = FindControl(f, "txtAnyTlsSni");
-                var fp = FindControl(f, "cmbAnyTlsFingerprint");
-                var insecure = FindControl(f, "chkAnyTlsInsecure");
-                Check(sni != null, "AnyTLS SNI field is created");
-                Check(fp != null, "AnyTLS fingerprint combo is created");
-                Check(insecure != null, "AnyTLS allow-insecure checkbox is created");
+                var sni = FindControl(f, "txtProtocolSni");
+                var fp = FindControl(f, "cmbProtocolFingerprint");
+                var insecure = FindControl(f, "chkProtocolInsecure");
+                Check(sni != null, "protocol SNI field is created");
+                Check(fp != null, "protocol fingerprint combo is created");
+                Check(insecure != null, "protocol allow-insecure checkbox is created");
                 Check(FindControl(f, "txtUpMbps") == null,
-                      "AnyTLS does not get Up/Down Mbps (a bandwidth knob is meaningless for a TLS protocol)");
+                      "these protocols do not get Up/Down Mbps (a bandwidth knob is meaningless for a TLS protocol)");
 
                 // The AnyTLS controls must not reuse a name from another panel.
                 // ServerTransportControl already owns cmbFingerprint; a second
@@ -259,6 +303,7 @@ namespace SingboxConfigCheck
         private static void Routing()
         {
             Check(SingboxConfigHandler.IsSingboxOnly(EConfigType.AnyTLS), "AnyTLS is routed to the sing-box generator");
+            Check(SingboxConfigHandler.IsSingboxOnly(EConfigType.Naive), "Naive is routed to the sing-box generator");
             foreach (var t in new[]
             {
                 EConfigType.VMess, EConfigType.VLESS, EConfigType.Trojan,
@@ -301,6 +346,7 @@ namespace SingboxConfigCheck
             // Enum values are persisted in saved profiles, so they must not move.
             Check((int)EConfigType.Mieru == 11, "Mieru is still 11 (saved profiles depend on it)");
             Check((int)EConfigType.AnyTLS == 12, "AnyTLS is 12");
+            Check((int)EConfigType.Naive == 13, "Naive is 13");
         }
     }
 }

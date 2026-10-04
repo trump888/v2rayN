@@ -188,6 +188,11 @@ namespace v2rayN
         /// </summary>
         public const string hysteria2Protocol = "hysteria2://";
         public const string anytlsProtocol = "anytls://";
+        // Matches 7.x NaiveHttpsProtocolShare / NaiveQuicProtocolShare. The
+        // "+quic" variant is a QUIC transport; this port generates the HTTPS
+        // variant and imports both.
+        public const string naiveProtocol = "naive+https://";
+        public const string naiveQuicProtocol = "naive+quic://";
         /// <summary>
         /// hysteria2
         /// </summary>

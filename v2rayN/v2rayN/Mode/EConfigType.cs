@@ -21,6 +21,9 @@ namespace v2rayN.Mode
         // (different models); share links are the interchange format and those
         // are protocol-based, so the number only has to be stable within this
         // build. 12 is unused here.
-        AnyTLS = 12
+        AnyTLS = 12,
+        // 13 is unused in this build. 7.x uses 12 for Naive, but 12 is AnyTLS
+        // here; same reasoning as AnyTLS = 12 not being 11.
+        Naive = 13
     }
 }

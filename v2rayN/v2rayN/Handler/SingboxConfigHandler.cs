@@ -31,7 +31,7 @@ namespace v2rayN.Handler
         /// so far.
         /// </summary>
         public static bool IsSingboxOnly(EConfigType configType)
-            => configType == EConfigType.AnyTLS;
+            => configType == EConfigType.AnyTLS || configType == EConfigType.Naive;
 
         /// <summary>
         /// Build a complete sing-box configuration for a single server.
@@ -106,17 +106,43 @@ namespace v2rayN.Handler
         {
             var outbound = new JObject
             {
-                ["type"] = "anytls",
+                // sing-box has no MASQUE outbound and never has: verified against
+                // 1.10.7, 1.11.15 and 1.14.2, all of which reject both "masque" and
+                // "masque-client" as an unknown type. 7.x emits "masque-client",
+                // which no released sing-box accepts, so MASQUE is deliberately not
+                // implemented here rather than shipped broken.
+                ["type"] = item.configType == EConfigType.Naive ? "naive" : "anytls",
                 ["tag"] = "proxy",
                 ["server"] = item.address,
                 ["server_port"] = item.port,
             };
 
-            // VmessItem stores the password in `id` for the protocols that use a
+            // VmessItem stores the credential in `id` for the protocols that use a
             // plain password (Hysteria2 does the same), so no new field is needed.
+            //
+            // naive is the one case with an optional username. Rather than add a
+            // field to the shared model, `id` holds the raw userinfo and is split
+            // here -- which is exactly what 7.x's NaiveFmt does: "user:pass" when
+            // it contains a colon, otherwise the whole thing is the password.
             if (!string.IsNullOrEmpty(item.id))
             {
-                outbound["password"] = item.id;
+                if (item.configType == EConfigType.Naive)
+                {
+                    var colon = item.id.IndexOf(':');
+                    if (colon >= 0)
+                    {
+                        outbound["username"] = item.id.Substring(0, colon);
+                        outbound["password"] = item.id.Substring(colon + 1);
+                    }
+                    else
+                    {
+                        outbound["password"] = item.id;
+                    }
+                }
+                else
+                {
+                    outbound["password"] = item.id;
+                }
             }
 
             var tls = GenTls(item);
