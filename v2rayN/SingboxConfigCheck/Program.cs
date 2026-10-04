@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using v2rayN;
 using v2rayN.Handler;
 using v2rayN.Mode;
 
@@ -187,8 +188,8 @@ namespace SingboxConfigCheck
             }
 
             // Enum values are persisted in saved profiles, so they must not move.
-            Check((int)ECoreType.Mieru == 11, "Mieru is still 11 (saved profiles depend on it)");
-            Check((int)ECoreType.AnyTLS == 12, "AnyTLS is 12");
+            Check((int)EConfigType.Mieru == 11, "Mieru is still 11 (saved profiles depend on it)");
+            Check((int)EConfigType.AnyTLS == 12, "AnyTLS is 12");
         }
     }
 }

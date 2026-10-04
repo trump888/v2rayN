@@ -1,5 +1,13 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <!-- The CI-only SingboxConfigCheck project exercises ShareHandler,
+         V2rayConfigHandler and Global, which are all internal. Grant it access
+         rather than widening the shipped public API to make them testable. -->
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>SingboxConfigCheck</_Parameter1>
+    </AssemblyAttribute>
+  </PropertyGroup>
+  <PropertyGroup>
     <TargetFramework>net48</TargetFramework>
     <LangVersion>preview</LangVersion>
     <OutputType>WinExe</OutputType>
