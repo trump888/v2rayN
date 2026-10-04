@@ -196,12 +196,20 @@ namespace SingboxConfigCheck
                 Check(f.Controls.Count > 0, "form has controls after Load");
 
                 // AnyTLS-specific controls, created dynamically by AddNewProtocolControls.
-                var sni = FindControl(f, "txtSni");
-                var fp = FindControl(f, "cmbFingerprint");
-                var insecure = FindControl(f, "chkAllowInsecure");
+                var sni = FindControl(f, "txtAnyTlsSni");
+                var fp = FindControl(f, "cmbAnyTlsFingerprint");
+                var insecure = FindControl(f, "chkAnyTlsInsecure");
                 Check(sni != null, "AnyTLS SNI field is created");
                 Check(fp != null, "AnyTLS fingerprint combo is created");
                 Check(insecure != null, "AnyTLS allow-insecure checkbox is created");
+
+                // The AnyTLS controls must not reuse a name from another panel.
+                // ServerTransportControl already owns cmbFingerprint; a second
+                // control with that name in the same form breaks lookup and
+                // accessibility, and would make this test pass for the wrong reason.
+                var transportFp = FindControl(f, "cmbFingerprint");
+                Check(transportFp == null || !ReferenceEquals(transportFp, fp),
+                      "AnyTLS fingerprint combo does not collide with ServerTransportControl's");
 
                 // And the regression: the same must now be true for Hysteria2, whose
                 // fields were the ones silently missing.

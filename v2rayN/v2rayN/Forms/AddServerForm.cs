@@ -45,6 +45,7 @@ namespace v2rayN.Forms
                 panVmess.Controls.Add(lblUpMbps);
 
                 txtUpMbps = new TextBox();
+                txtUpMbps.Name = "txtUpMbps";
                 txtUpMbps.Location = new System.Drawing.Point(85, yPos - 3);
                 txtUpMbps.Size = new System.Drawing.Size(100, 20);
                 txtUpMbps.Text = "100";
@@ -58,6 +59,7 @@ namespace v2rayN.Forms
                 panVmess.Controls.Add(lblDownMbps);
 
                 txtDownMbps = new TextBox();
+                txtDownMbps.Name = "txtDownMbps";
                 txtDownMbps.Location = new System.Drawing.Point(85, yPos - 3);
                 txtDownMbps.Size = new System.Drawing.Size(100, 20);
                 txtDownMbps.Text = "100";
@@ -73,6 +75,7 @@ namespace v2rayN.Forms
                     panVmess.Controls.Add(lblObfs);
 
                     cmbObfs = new ComboBox();
+                cmbObfs.Name = "cmbObfs";
                     cmbObfs.Location = new System.Drawing.Point(85, yPos - 3);
                     cmbObfs.Size = new System.Drawing.Size(100, 20);
                     cmbObfs.Items.AddRange(new object[] { "salamander", "" });
@@ -87,6 +90,7 @@ namespace v2rayN.Forms
                     panVmess.Controls.Add(lblObfsPassword);
 
                     txtObfsPassword = new TextBox();
+                txtObfsPassword.Name = "txtObfsPassword";
                     txtObfsPassword.Location = new System.Drawing.Point(85, yPos - 3);
                     txtObfsPassword.Size = new System.Drawing.Size(150, 20);
                     panVmess.Controls.Add(txtObfsPassword);
@@ -106,6 +110,7 @@ namespace v2rayN.Forms
                     panVmess.Controls.Add(lblSni);
 
                     txtSni = new TextBox();
+                    txtSni.Name = "txtAnyTlsSni";
                     txtSni.Location = new System.Drawing.Point(85, yPos - 3);
                     txtSni.Size = new System.Drawing.Size(250, 20);
                     panVmess.Controls.Add(txtSni);
@@ -118,6 +123,7 @@ namespace v2rayN.Forms
                     panVmess.Controls.Add(lblFingerprint);
 
                     cmbFingerprint = new ComboBox();
+                    cmbFingerprint.Name = "cmbAnyTlsFingerprint";
                     cmbFingerprint.Location = new System.Drawing.Point(85, yPos - 3);
                     cmbFingerprint.Size = new System.Drawing.Size(150, 20);
                     cmbFingerprint.Items.AddRange(new object[] { "", "chrome", "firefox", "safari", "ios", "android", "edge", "random", "360", "qq" });
@@ -125,6 +131,7 @@ namespace v2rayN.Forms
 
                     yPos += 25;
                     chkAllowInsecure = new CheckBox();
+                    chkAllowInsecure.Name = "chkAnyTlsInsecure";
                     chkAllowInsecure.Text = "Allow Insecure";
                     chkAllowInsecure.Location = new System.Drawing.Point(85, yPos - 3);
                     chkAllowInsecure.Size = new System.Drawing.Size(120, 20);
@@ -141,6 +148,7 @@ namespace v2rayN.Forms
                     panVmess.Controls.Add(lblCertSha256);
 
                     txtCertSha256 = new TextBox();
+                txtCertSha256.Name = "txtCertSha256";
                     txtCertSha256.Location = new System.Drawing.Point(85, yPos - 3);
                     txtCertSha256.Size = new System.Drawing.Size(250, 20);
                     panVmess.Controls.Add(txtCertSha256);
