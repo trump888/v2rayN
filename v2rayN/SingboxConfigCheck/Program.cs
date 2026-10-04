@@ -117,14 +117,27 @@ namespace SingboxConfigCheck
             };
             LazyConfig.Instance.SetConfig(ref cfg);
 
+            // Pass a fileName, then read the file. GenerateClientConfig puts the
+            // config in the out parameter only when fileName is empty -- that is
+            // pre-existing behaviour, and V2rayHandler ignores the out param
+            // because it passes a fileName.
             var file = Path.Combine(outDir, "roundtrip.json");
             var rc = V2rayConfigHandler.GenerateClientConfig(item, file, out var genMsg, out var content);
             Check(rc == 0, $"GenerateClientConfig succeeds for AnyTLS (msg: {genMsg})");
-            Check(content.Contains("\"anytls\""), "generated config is sing-box AnyTLS, not v2ray JSON");
-            Check(!content.Contains("\"outbounds\"") || content.Contains("\"route\""),
-                  "generated config is sing-box shaped (has route, not v2ray inbounds)");
             Check(File.Exists(file), "config was written to disk");
-            Check(content.Contains("10808"), $"mixed inbound uses the configured local port (10808), not a constant");
+
+            var written = File.Exists(file) ? File.ReadAllText(file) : string.Empty;
+            Check(written.Contains("\"type\": \"anytls\""), "generated config is sing-box AnyTLS, not v2ray JSON");
+            Check(written.Contains("\"route\""), "generated config is sing-box shaped (has route)");
+            Check(!written.Contains("\"log\": {\n    \"access\"") && !written.Contains("\"inbounds\": [\n    {\n      \"tag\": \"socks\""),
+                  "generated config is not v2ray-shaped");
+            Check(written.Contains("\"listen_port\": 10808"),
+                  $"mixed inbound uses the configured local port 10808, not a constant (head: {written.Substring(0, Math.Min(160, written.Length))})");
+
+            // And with no fileName the content must come back through the out param.
+            var rc3 = V2rayConfigHandler.GenerateClientConfig(item, null, out _, out var inlineContent);
+            Check(rc3 == 0 && inlineContent.Contains("\"type\": \"anytls\""),
+                  "with no fileName the config comes back through the out parameter");
 
             // A VMess profile must NOT be diverted to the sing-box generator.
             var vmess = new VmessItem

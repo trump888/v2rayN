@@ -65,7 +65,13 @@ namespace v2rayN.Handler
                     }
                     else
                     {
-                        File.WriteAllText(fileName, sbContent);
+                        // File.CreateText, like Utils.ToJsonFile, so the config is
+                        // UTF-8 without a BOM -- matching what the v2ray path writes.
+                        // File.WriteAllText would add a BOM.
+                        using (var file = File.CreateText(fileName))
+                        {
+                            file.Write(sbContent);
+                        }
                     }
                     return 0;
                 }
