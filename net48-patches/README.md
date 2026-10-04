@@ -102,7 +102,14 @@ types and members as additive extensions:
 
 - `Lock` — `System.Threading.Lock` is .NET 9+. The shim must match the BCL shape
   exactly (`public sealed class`, nested `public readonly ref struct Scope`,
-  `EnterScope()`) or `lock` statements fail with CS0656.
+  `EnterScope()`) or `lock` statements fail with CS0656. Only `ServiceLib` gets
+  this copy: no `v2rayN` source references `Lock`, and ServiceLib already
+  exposes a public one, so a local copy only warned CS0436.
+- `IsExternalInit` — needed by `v2rayN` even though not one of its own sources
+  uses `init` or records. `ReactiveUI.SourceGenerators` emits the `[Reactive]`
+  partial properties as `init` accessors, and `init` requires the predefined
+  `IsExternalInit` type in *the compiling assembly*. ServiceLib's copy is
+  `internal`, so it is invisible to `v2rayN` and the build fails CS0518.
 - `CodeAnalysisNullability` — net48's mscorlib declares the nullability
   attributes but marks them `internal`, so the ReactiveUI source generator's
   `[MemberNotNull]` output failed with CS0122.
@@ -133,6 +140,48 @@ Both compiled fine and failed at runtime, which is why they are called out:
   ReactiveUI's WPF platform registration. ReactiveUI 24 also no longer ships
   `System.Reactive`, so those shims would not even compile.
 
+### The `DisposeWith` shim's parameter type is load-bearing
+
+`WpfPolyfills.cs` declares the `DisposeWith` replacement as
+`__DisposeWith<T>(this T disposable, ICollection<IDisposable> disposables)`. The
+`ICollection<IDisposable>` is not cosmetic — typing it as `object` breaks the
+build in all 20 `WhenActivated` blocks.
+
+`ReactiveUI.WpfViewForMixins` declares **two** overloads:
+
+```csharp
+WhenActivated<TView>(TView, Action<Action<IDisposable>>)
+WhenActivated<TView>(TView, Action<MultipleDisposable>)
+```
+
+Upstream bodies only ever use the parameter as `x.DisposeWith(disposables)`, so
+the lambda's parameter type is pinned entirely by whatever `DisposeWith`
+accepts. ReactiveUI's own `DisposeWith` takes a `MultipleDisposable`, which
+implements `ICollection<IDisposable>`; `Action<IDisposable>` implements neither,
+so exactly one overload is applicable and upstream compiles.
+
+Give the shim an `object` parameter and every one of those bodies is *also*
+valid for `object`, so both overloads become applicable and the compiler reports
+CS0121. Keeping `ICollection<IDisposable>` restores upstream's resolution
+exactly, and it makes `Add` a direct interface call — the earlier reflective
+`FindAdder` plus its `ConcurrentDictionary` cache are gone.
+
+Verified against the shipped assemblies rather than assumed: `ReactiveUI.Wpf`
+24.2.0 `net481` really does carry both overloads, and `MultipleDisposable`
+(`ReactiveUI.Disposables` 8.2.0) really does implement `ICollection<IDisposable>`.
+
+### Rewrites that outlived their reason
+
+`SimpleViewLocator.cs` used to be rewritten for a ReactiveUI **19.x**
+`IViewLocator`. That rule is gone, because upstream now satisfies
+ReactiveUI 24.3.0's interface on its own. The instructive part is how it failed:
+its signature half stopped matching once upstream dropped the `= null` default
+and the `new()` constraint, so it silently did nothing, while the body half kept
+rewriting `factory() as IViewFor<TViewModel>` to `factory() as IViewFor` — which
+is what produced CS0266. A partially-applied rewrite is worse than none, so
+delete the rule when its premise disappears rather than leaving it to fire on
+whatever still matches.
+
 ## Known behaviour differences from upstream
 
 | Area | Difference |
@@ -162,8 +211,12 @@ So the pipeline fails loudly instead:
   `ReactiveUI.SourceGenerators` reference, a missing `RuntimeIdentifier`, and an
   unconditional `UdpTest` reference.
 - CI additionally asserts the publish output is *runnable*: required managed and
-  native assemblies present, no Fody artifacts, and binding redirects actually
-  present in `v2rayN.exe.config`.
+  native assemblies present, no Fody artifacts, and every assembly reference in
+  the output either matching the shipped version or covered by a binding
+  redirect (strong-named assemblies only — see above).
+- The port stamps the real upstream version into `Directory.Build.props` at
+  apply time, so a build of a new upstream release reports that release's
+  version instead of a stale literal.
 - Rewrites are line-anchored on purpose. An earlier `[^;]+;` pattern could
   swallow newlines and delete the closing `};` of an object initializer along
   with real code; that class of pattern is banned.
@@ -171,18 +224,62 @@ So the pipeline fails loudly instead:
 ## WPF project: what is and is not verified
 
 `verify-local.sh` cannot build `v2rayN` (WPF) or `AmazTool`, because `UseWPF`
-needs a Windows SDK. Those two are compile-gated by CI. Everything else here was
-verified locally against upstream `10efd1a5`.
+needs a Windows SDK. Those two are compile-gated by
+`.github/workflows/build-net48.yml`.
+
+Current state, both paths green with **0 warnings, 0 errors**:
+
+| Built from | Result |
+| --- | --- |
+| upstream `master` (`3187eeef`) | success — 11 required files, 48 managed assemblies bind |
+| latest upstream release `7.25.4` | success — version stamped `7.25.4-net48` |
+
+The published artifact is 76 files including `e_sqlite3.dll`,
+`v2rayN.exe.config` and `AmazTool.exe`.
+
+This matters because the WPF project is where every non-obvious breakage lived.
+`verify-local.sh` compiles `ServiceLib` only, so CS0518, CS0121 and CS0266 were
+all invisible to it — they needed the Windows SDK. Do not treat a green
+`verify-local.sh` as evidence the port builds.
 
 Where a rewrite depended on an exact third-party signature, it was checked
 against the shipped assembly rather than assumed. Example: `SimpleViewLocator`
-implements `ReactiveUI.IViewLocator`, and the port strips the `new()` constraint
-from `ResolveView<T>`. That is only legal if the interface no longer declares
-it (C# requires an implementing method's constraints to match exactly, so
-getting this wrong is a CS0425 compile error). Reading the generic-parameter
-constraints out of `ReactiveUI.Core` 24.3.0 shows `ResolveView<TViewModel>` has
+implements `ReactiveUI.IViewLocator`, and the port used to strip the `new()`
+constraint from `ResolveView<T>`. That is only legal if the interface no longer
+declares it (C# requires an implementing method's constraints to match exactly,
+so getting this wrong is a CS0425 compile error). Reading the generic-parameter
+constraints out of `ReactiveUI.Core` 24.3.0 showed `ResolveView<TViewModel>` had
 `constraints=[]` with only `ReferenceTypeConstraint` — i.e. `where T : class`,
-no `new()` — which is what the patched file declares.
+no `new()` — which is exactly what upstream already declares. That is why the
+rule was deleted rather than fixed.
+
+## Binding redirects on .NET Framework
+
+`AutoGenerateBindingRedirects` (on by default for SDK-style .NET Framework
+projects) emits the four redirects the app actually needs, verified in the
+built `v2rayN.exe.config`:
+
+| Assembly | Redirect |
+| --- | --- |
+| `System.Memory` | `4.0.5.0` |
+| `System.Buffers` | `4.0.5.0` |
+| `System.Threading.Tasks.Extensions` | `4.2.4.0` |
+| `Microsoft.Bcl.AsyncInterfaces` | `10.0.0.12` |
+
+What it does **not** need is the `ReactiveUI.Primitives` /
+`ReactiveUI.Primitives.Core` / `ReactiveUI.Disposables` `7.0.0.0` → `8.0.0.0`
+skew that `ReactiveUI.WPF` 24.2.0 and `Splat` 21.0.0 carry. Those assemblies
+ship with an **empty public key token**, and the .NET Framework loader binds
+simple-name assemblies by name alone, ignoring the version. Only *strong-named*
+mismatches need a redirect. (Upstream has the same version skew; it is invisible
+on .NET 10, where the runtime resolves by name and rolls forward regardless.)
+
+The CI gate encodes exactly that distinction rather than a list of names: for
+every assembly reference in the output that resolves to a file we also ship,
+the referenced version must match the shipped version **or** `v2rayN.exe.config
+must redirect it there — and a version mismatch only counts if the shipped
+assembly is strong-named. Native DLLs such as `e_sqlite3.dll` have no PE
+metadata and are skipped.
 
 ## Rebasing onto a new upstream release
 
