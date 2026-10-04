@@ -221,6 +221,70 @@ So the pipeline fails loudly instead:
   swallow newlines and delete the closing `};` of an object initializer along
   with real code; that class of pattern is banned.
 
+## Two bugs that only show up when you run it
+
+Neither is visible to `verify-local.sh`, and neither produces a build error. Both
+were found by running the artifact, which is the argument for doing so.
+
+### `Environment.OSVersion` lies without `supportedOS`, and the update page depends on it
+
+`CoreInfoManager.GetCheckUpdateCoreTypes()` builds the update list like this:
+
+```csharp
+if (!(Utils.IsWindows() && Environment.OSVersion.Version.Major < 10))
+{
+    lst.Add(ECoreType.Xray);
+    lst.Add(ECoreType.mihomo);
+    lst.Add(ECoreType.sing_box);
+}
+```
+
+Upstream's `app.manifest` has no `<compatibility>` section, which is fine on
+`net10.0-windows`: .NET 5+ always reports the real OS version. On .NET Framework
+it is not fine — without a `supportedOS` declaration `Environment.OSVersion`
+returns **6.2** regardless of what is really running. So `Major < 10` was true
+on *every* Windows and all three cores were silently dropped from the update
+page. Same source, same OS, one TFM apart.
+
+`rewrite-source.ps1` therefore injects a `<compatibility>` block declaring
+Windows 7 through Windows 11 into upstream's own manifest. Per Microsoft,
+declaring Windows 10 support "will not have any effect when running your app on
+previous operating systems", so listing it next to Windows 7 does not cost
+Windows 7 its compatibility behaviour. It is skipped if a `<compatibility>`
+section is already present, so a future upstream manifest that declares its own
+list is left alone.
+
+Note the intended behaviour is preserved: on Windows 7 those three cores stay
+hidden, because current Xray/sing-box/mihomo are built with Go toolchains that
+no longer support Win7. Only `v2rayN` itself and the geo files update there.
+
+The same manifest pass also sets PerMonitorV2 DPI awareness, which
+`v2rayN.csproj` already claimed was "enabled via app.manifest (already present)".
+It was not present, so the port ran DPI-unaware and rendered blurry on scaled
+displays while upstream on `net10.0` is PerMonitorV2 by default.
+
+### SkiaSharp was shipping ~126 MB nothing loads
+
+`ZXing.Net.Bindings.SkiaSharp` → `SkiaSharp` fans out to two native packages
+that between them add this to a win-x64 build:
+
+| File | Size | Why it is there |
+| --- | --- | --- |
+| `libSkiaSharp.pdb` | 80.1 MB | `runtimes/win-x64/native/`; the SDK treats *every* file in that folder as a native runtime asset, so the pdb is copied alongside the dll |
+| `libSkiaSharp.dylib` | 14.5 MB | the macOS package's `buildTransitive` targets copy it unconditionally and ignore the RID |
+| `x86/`, `arm64/` copies | 19.6 MB | other architectures |
+
+`Directory.Build.props` sets `ShouldIncludeNativeSkiaSharp=False` (the opt-out
+both packages expose) and drops native `.pdb` files from `NativeCopyLocalItems`.
+Turning the opt-out off does **not** lose the Windows native: `libSkiaSharp.dll`
+reaches the output through the SDK's own RID asset resolution, not through those
+packages' targets.
+
+Measured on a clean net48 `ServiceLib` build: **137.14 MB → 11.83 MB**. The full
+publish output went **160.5 MB → 35.2 MB**. CI asserts both directions —
+`libSkiaSharp.dll` must be present, and the pdb, dylib and arch copies must be
+absent — so neither over-trimming nor regressing can pass.
+
 ## WPF project: what is and is not verified
 
 `verify-local.sh` cannot build `v2rayN` (WPF) or `AmazTool`, because `UseWPF`
