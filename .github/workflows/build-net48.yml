@@ -321,8 +321,11 @@ jobs:
             }
           }
           if ($unresolved) {
-            Write-Error "output has assembly references that would fail to bind on .NET Framework:"
-            $unresolved | Select-Object -First 20 | ForEach-Object { Write-Host "  $_" }
+            # Emit the whole report as one error: a bare Write-Error followed by
+            # per-line Write-Host loses the list, because Write-Error terminates
+            # the step before the pipeline runs.
+            $detail = ($unresolved | Select-Object -First 20) -join "`n  "
+            Write-Error "output has assembly references that would fail to bind on .NET Framework:`n  $detail"
             exit 1
           }
 
