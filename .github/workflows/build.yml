@@ -276,6 +276,10 @@ jobs:
 
         # Generate the configs. Done via the real v2rayN project reference, so the
         # output comes from the same VmessItem the app populates.
+        # This project is deliberately not in v2rayN.sln, so the solution-wide
+        # restore above does not cover it -- NETSDK1004 otherwise.
+        nuget restore v2rayN/SingboxConfigCheck/SingboxConfigCheck.csproj
+        if ($LASTEXITCODE -ne 0) { throw "SingboxConfigCheck restore failed" }
         msbuild v2rayN/SingboxConfigCheck/SingboxConfigCheck.csproj `
           /p:Configuration=Release /p:Platform="Any CPU" /v:minimal /nologo
         if ($LASTEXITCODE -ne 0) { throw "SingboxConfigCheck failed to build" }
