@@ -202,6 +202,8 @@ namespace SingboxConfigCheck
                 Check(sni != null, "AnyTLS SNI field is created");
                 Check(fp != null, "AnyTLS fingerprint combo is created");
                 Check(insecure != null, "AnyTLS allow-insecure checkbox is created");
+                Check(FindControl(f, "txtUpMbps") == null,
+                      "AnyTLS does not get Up/Down Mbps (a bandwidth knob is meaningless for a TLS protocol)");
 
                 // The AnyTLS controls must not reuse a name from another panel.
                 // ServerTransportControl already owns cmbFingerprint; a second

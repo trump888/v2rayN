@@ -34,10 +34,17 @@ namespace v2rayN.Forms
 
         private void AddNewProtocolControls()
         {
-            if (eConfigType == EConfigType.Hysteria2 || eConfigType == EConfigType.Mieru || eConfigType == EConfigType.TUIC)
+            // AnyTLS joins this list because it uses the same yPos-driven dynamic
+            // controls on panVmess. It only differs in which ones it adds.
+            if (eConfigType == EConfigType.Hysteria2 || eConfigType == EConfigType.Mieru
+                || eConfigType == EConfigType.TUIC || eConfigType == EConfigType.AnyTLS)
             {
                 int yPos = 120;
 
+                // Up/Down Mbps apply to the QUIC-based protocols only; AnyTLS is a
+                // TLS protocol and has no bandwidth knob.
+                if (eConfigType != EConfigType.AnyTLS)
+                {
                 lblUpMbps = new Label();
                 lblUpMbps.Text = "Up Mbps:";
                 lblUpMbps.Location = new System.Drawing.Point(10, yPos);
@@ -64,6 +71,7 @@ namespace v2rayN.Forms
                 txtDownMbps.Size = new System.Drawing.Size(100, 20);
                 txtDownMbps.Text = "100";
                 panVmess.Controls.Add(txtDownMbps);
+                }
 
                 if (eConfigType == EConfigType.Hysteria2)
                 {
