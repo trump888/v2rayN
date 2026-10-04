@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Verifies that Handler/SingboxConfigHandler.cs emits configurations sing-box
+    actually accepts.
+
+    Not part of v2rayN.sln and never shipped: this is a CI-only harness. The
+    reason it exists is that "it compiled" says nothing about whether the emitted
+    JSON is a config sing-box will run. A wrong field name in a generator is
+    invisible to the compiler and only fails when a user's proxy silently refuses
+    to start, so the workflow runs `sing-box check` over everything this writes.
+
+    It ProjectReferences the real v2rayN project rather than re-declaring the
+    model, so the output is produced from the same VmessItem the app uses.
+  -->
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <Nullable>disable</Nullable>
+    <IsPackable>false</IsPackable>
+    <AssemblyName>SingboxConfigCheck</AssemblyName>
+    <RootNamespace>SingboxConfigCheck</RootNamespace>
+    <UseWindowsForms>false</UseWindowsForms>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\v2rayN\v2rayN.csproj" />
+  </ItemGroup>
+
+</Project>
