@@ -4,6 +4,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using v2rayN.Base;
 using v2rayN.Mode;
+using v2rayN.Tool;
 
 namespace v2rayN.Handler
 {
