@@ -1,12 +1,14 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
+  <ItemGroup>
     <!-- The CI-only SingboxConfigCheck project exercises ShareHandler,
          V2rayConfigHandler and Global, which are all internal. Grant it access
-         rather than widening the shipped public API to make them testable. -->
+         rather than widening the shipped public API to make them testable.
+         An item, so it belongs in an ItemGroup: MSBuild rejects it inside a
+         PropertyGroup with MSB4066. -->
     <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
       <_Parameter1>SingboxConfigCheck</_Parameter1>
     </AssemblyAttribute>
-  </PropertyGroup>
+  </ItemGroup>
   <PropertyGroup>
     <TargetFramework>net48</TargetFramework>
     <LangVersion>preview</LangVersion>
