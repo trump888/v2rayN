@@ -33,7 +33,12 @@ namespace v2rayN.Tool
             roller.ActivateOptions();
             hierarchy.Root.AddAppender(roller);
 
-            var memory = new MemoryAppender();
+            // Bounded. log4net's MemoryAppender keeps every event it receives, so
+            // an unbounded one grows for as long as the app is open -- a slow leak
+            // in a tray application that is expected to run for days. 500 events
+            // is far more than the in-memory log view needs and still keeps the
+            // recent tail available.
+            var memory = new MemoryAppender { MaxBufferSize = 500 };
             memory.ActivateOptions();
             hierarchy.Root.AddAppender(memory);
 
