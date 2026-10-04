@@ -193,10 +193,7 @@ namespace SingboxConfigCheck
                     onLoad.Invoke(f, new object[] { f, EventArgs.Empty });
                 }
 
-                // The bug: these controls come from AddNewProtocolControls, which
-                // used to be called too early to add anything.
-                var anyTlsControls = new System.Windows.Forms.ControlCollection(f.Controls);
-                Check(anyTlsControls.Count > 0, "form has controls after Load");
+                Check(f.Controls.Count > 0, "form has controls after Load");
 
                 // AnyTLS-specific controls, created dynamically by AddNewProtocolControls.
                 var sni = FindControl(f, "txtSni");

@@ -22,6 +22,9 @@
     <AssemblyName>SingboxConfigCheck</AssemblyName>
     <RootNamespace>SingboxConfigCheck</RootNamespace>
     <UseWindowsForms>true</UseWindowsForms>
+    <!-- net48 defaults to C# 7.3; `using` declarations need 8.0. Matches the
+         main project's LangVersion. -->
+    <LangVersion>preview</LangVersion>
   </PropertyGroup>
 
   <ItemGroup>
