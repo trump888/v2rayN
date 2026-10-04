@@ -411,6 +411,12 @@ jobs:
 
       - name: Download xray/sing-box cores (optional)
         shell: pwsh
+        # Optional means optional. This step used to fail the whole build when
+        # api.github.com answered 403 "API rate limit exceeded" -- which happens
+        # routinely, because unauthenticated GitHub API calls are limited to 60
+        # per hour *per IP* and Actions runners share egress IPs. Losing the zip
+        # over a rules file is the wrong trade.
+        continue-on-error: true
         run: |
           # Download cores matching the upstream v2rayN-core-bin repository
           # so the produced zip is immediately usable.
@@ -419,26 +425,53 @@ jobs:
 
           $ProgressPreference = "SilentlyContinue"
 
+          # Authenticated API calls: 1000/hour instead of 60, and it is the
+          # difference between a reliable nightly and a coin flip.
+          $ghHeaders = @{}
+          if ($env:GITHUB_TOKEN) {
+            $ghHeaders = @{ Authorization = "Bearer $env:GITHUB_TOKEN"; Accept = "application/vnd.github+json" }
+            Write-Host "Using GITHUB_TOKEN for api.github.com calls"
+          } else {
+            Write-Warning "No GITHUB_TOKEN; unauthenticated api.github.com allows only 60 requests/hour"
+          }
+
+          function Get-LatestTag([string]$repo) {
+            try {
+                return (Invoke-RestMethod "https://api.github.com/repos/$repo/releases/latest" -Headers $ghHeaders).tag_name
+            } catch {
+                Write-Warning "could not resolve the latest $repo release: $($_.Exception.Message)"
+                return $null
+            }
+          }
+
           # Xray-core latest stable
-          $xrayLatest = (Invoke-RestMethod "https://api.github.com/repos/XTLS/Xray-core/releases/latest").tag_name
-          $xrayVer = $xrayLatest.TrimStart('v')
-          Write-Host "Downloading Xray-core $xrayVer..."
-          Invoke-WebRequest "https://github.com/XTLS/Xray-core/releases/download/v$xrayVer/Xray-windows-64.zip" -OutFile xray.zip
-          Expand-Archive -Force xray.zip xray-extracted
-          Copy-Item xray-extracted/xray.exe "$bin/xray/" -Force
-          Copy-Item xray-extracted/geoip.dat "$bin/xray/" -Force
-          Copy-Item xray-extracted/geosite.dat "$bin/xray/" -Force
+          $xrayLatest = Get-LatestTag "XTLS/Xray-core"
+          if ($xrayLatest) {
+            $xrayVer = $xrayLatest.TrimStart('v')
+            Write-Host "Downloading Xray-core $xrayVer..."
+            try {
+              Invoke-WebRequest "https://github.com/XTLS/Xray-core/releases/download/v$xrayVer/Xray-windows-64.zip" -OutFile xray.zip
+              Expand-Archive -Force xray.zip xray-extracted
+              Copy-Item xray-extracted/xray.exe "$bin/xray/" -Force
+              Copy-Item xray-extracted/geoip.dat "$bin/xray/" -Force
+              Copy-Item xray-extracted/geosite.dat "$bin/xray/" -Force
+            } catch { Write-Warning "Xray-core download failed: $($_.Exception.Message)" }
+          }
 
           # sing-box latest stable
-          $singLatest = (Invoke-RestMethod "https://api.github.com/repos/SagerNet/sing-box/releases/latest").tag_name
-          $singVer = $singLatest.TrimStart('v')
-          Write-Host "Downloading sing-box $singVer..."
-          Invoke-WebRequest "https://github.com/SagerNet/sing-box/releases/download/v$singVer/sing-box-$singVer-windows-amd64.zip" -OutFile singbox.zip
-          Expand-Archive -Force singbox.zip singbox-extracted
-          $singExe = Get-ChildItem singbox-extracted -Recurse -Filter "sing-box.exe" | Select-Object -First 1
-          Copy-Item $singExe.FullName "$bin/sing_box/" -Force
-          $cronet = Get-ChildItem singbox-extracted -Recurse -Filter "libcronet*.dll" | Select-Object -First 1
-          if ($cronet) { Copy-Item $cronet.FullName "$bin/sing_box/libcronet.dll" -Force }
+          $singLatest = Get-LatestTag "SagerNet/sing-box"
+          if ($singLatest) {
+            $singVer = $singLatest.TrimStart('v')
+            Write-Host "Downloading sing-box $singVer..."
+            try {
+              Invoke-WebRequest "https://github.com/SagerNet/sing-box/releases/download/v$singVer/sing-box-$singVer-windows-amd64.zip" -OutFile singbox.zip
+              Expand-Archive -Force singbox.zip singbox-extracted
+              $singExe = Get-ChildItem singbox-extracted -Recurse -Filter "sing-box.exe" | Select-Object -First 1
+              if ($singExe) { Copy-Item $singExe.FullName "$bin/sing_box/" -Force }
+              $cronet = Get-ChildItem singbox-extracted -Recurse -Filter "libcronet*.dll" | Select-Object -First 1
+              if ($cronet) { Copy-Item $cronet.FullName "$bin/sing_box/libcronet.dll" -Force }
+            } catch { Write-Warning "sing-box download failed: $($_.Exception.Message)" }
+          }
 
           # GeoSite / GeoIP for sing-box SRS rules
           New-Item -ItemType Directory -Force -Path "$bin/srss" | Out-Null
@@ -448,12 +481,15 @@ jobs:
             "geosite-private.srs", "geosite-category-ads-all.srs"
           )
           foreach ($s in $srss) {
+            # raw.githubusercontent.com answers 403 with an API rate-limit body
+            # when the runner IP is throttled; a partially-populated srss folder
+            # is better than no artifact at all.
             try {
               Invoke-WebRequest "https://raw.githubusercontent.com/2dust/sing-box-rules/refs/heads/rule-set-geoip/$s" -OutFile "$bin/srss/$s" -ErrorAction Stop
             } catch {
               try {
-                Invoke-WebRequest "https://raw.githubusercontent.com/2dust/sing-box-rules/refs/heads/rule-set-geosite/$s" -OutFile "$bin/srss/$s"
-              } catch { Write-Host "  $s not found (skipped)" }
+                Invoke-WebRequest "https://raw.githubusercontent.com/2dust/sing-box-rules/refs/heads/rule-set-geosite/$s" -OutFile "$bin/srss/$s" -ErrorAction Stop
+              } catch { Write-Warning "  $s not fetched (skipped): $($_.Exception.Message)" }
             }
           }
 
