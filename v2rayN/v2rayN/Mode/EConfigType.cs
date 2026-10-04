@@ -13,6 +13,12 @@ namespace v2rayN.Mode
         TUIC = 8,
         WireGuard = 9,
         HTTP = 10,
-        Mieru = 11
+        Mieru = 11,
+        // 12 matches the value 7.x uses, so a profile exported from the newer
+        // build keeps its meaning. Only the enum value so far: the sing-box
+        // generator exists (Handler/SingboxConfigHandler.cs) and is validated
+        // against `sing-box check` in CI, but the AddServerForm UI and the
+        // share-link parser are not wired up yet, so this type is not offered.
+        AnyTLS = 12
     }
 }
