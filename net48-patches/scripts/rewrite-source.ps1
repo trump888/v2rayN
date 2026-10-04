@@ -639,28 +639,25 @@ foreach ($f in $csFilesWpf) {
     }
 }
 
-# 19c: SimpleViewLocator.cs — IViewLocator interface mismatch
-# ReactiveUI 19.x IViewLocator requires:
-#   IViewFor ResolveView<T>(T? viewModel, string? contract)
-# Source has:
-#   IViewFor<TViewModel>? ResolveView<TViewModel>(string? contract)
-# Need to: 1) add viewModel param, 2) change return type to IViewFor? (non-generic)
-$simpleView = Join-Path $SourceDir "v2rayN/Common/SimpleViewLocator.cs"
-if (Test-Path $simpleView) {
-    $content = Get-Content $simpleView -Raw -Encoding UTF8
-    if ($content -notmatch 'net48.*IViewLocator') {
-        # 1) Change signature: add viewModel param, change return type to IViewFor?,
-        #    REMOVE "where TViewModel : class" (interface doesn't have it)
-        $content = $content -replace
-            'public IViewFor<TViewModel>\? ResolveView<TViewModel>\(string\? contract = null\) where TViewModel : class',
-            'public IViewFor? ResolveView<TViewModel>(TViewModel? viewModel, string? contract = null)'
-        # 2) Change body: "factory() as IViewFor<TViewModel>" -> "factory() as IViewFor"
-        #    (because without "where T : class", IViewFor<TViewModel> won't compile)
-        $content = $content -replace 'factory\(\) as IViewFor<TViewModel>', 'factory() as IViewFor'
-        [System.IO.File]::WriteAllText($simpleView, $content, [System.Text.UTF8Encoding]::new($false))
-        Write-Host "    patched SimpleViewLocator.cs (IViewLocator signature + constraint removed)"
-    }
-}
+# 19c: SimpleViewLocator.cs — REMOVED (was a ReactiveUI 19.x workaround).
+#
+# This used to rewrite
+#   public IViewFor<TViewModel>? ResolveView<TViewModel>(string? contract = null) where TViewModel : class
+# into a non-generic IViewFor-returning overload, because ReactiveUI 19.x
+# declared IViewLocator.ResolveView<T>(T?, string?). Both halves of it are dead
+# now, and one of them was actively harmful:
+#
+#   * The signature pattern stopped matching once upstream dropped the
+#     `= null` default and the `new()` constraint from its own declaration, so
+#     the signature half silently did nothing.
+#   * The body pattern `factory() as IViewFor<TViewModel>` -> `factory() as IViewFor`
+#     still matched, so the method kept returning IViewFor<TViewModel> while
+#     its body produced a plain IViewFor -> CS0266 in the WPF project.
+#
+# It is unnecessary in the first place: ReactiveUI 24.3.0's IViewLocator wants
+# exactly what upstream already declares, upstream compiles against it on
+# net10.0-windows, and the interface is identical across TFMs within the same
+# package version. So the file needs no edit at all on net48.
 
 # ---------------------------------------------------------------------------
 # Rewrite 20: [GeneratedRegex] source-generated regex -> cached static Regex
