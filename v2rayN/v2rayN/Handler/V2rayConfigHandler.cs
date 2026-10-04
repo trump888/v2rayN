@@ -40,6 +40,36 @@ namespace v2rayN.Handler
                 }
 
                 msg = ResUI.InitialConfiguration;
+
+                // Protocols that only sing-box speaks. Emitting v2ray/Xray JSON for
+                // these produces a config the chosen core silently refuses, so
+                // route them to the sing-box generator instead. Done here, at the
+                // one public entry point, rather than at each caller, so a new
+                // call site cannot forget.
+                if (SingboxConfigHandler.IsSingboxOnly(node.configType))
+                {
+                    // The mixed inbound has to listen where the rest of the app
+                    // expects the local proxy. 5.39 keeps that in config.inbound
+                    // (default 10808, user-editable in OptionSettingForm), not in a
+                    // constant, so read it the same way the v2ray path does --
+                    // GetInbound() below uses GetLocalPort(Global.InboundSocks).
+                    var localPort = LazyConfig.Instance.GetConfig().GetLocalPort(Global.InboundSocks);
+                    if (SingboxConfigHandler.GenConfig(node, localPort, "warning", null, out var sbContent) != 0)
+                    {
+                        msg = ResUI.FailedGenDefaultConfiguration;
+                        return -1;
+                    }
+                    if (Utils.IsNullOrEmpty(fileName))
+                    {
+                        content = sbContent;
+                    }
+                    else
+                    {
+                        File.WriteAllText(fileName, sbContent);
+                    }
+                    return 0;
+                }
+
                 if (node.configType == EConfigType.Custom)
                 {
                     return GenerateClientCustomConfig(node, fileName, out msg);

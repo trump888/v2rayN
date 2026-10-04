@@ -45,9 +45,22 @@ namespace SingboxConfigCheck
                 Console.WriteLine($"generated {name}.json");
             }
 
+            // The routing predicate must agree with the enum, or a protocol would
+            // silently keep generating v2ray JSON that the core cannot read.
+            if (!SingboxConfigHandler.IsSingboxOnly(EConfigType.AnyTLS))
+            {
+                Console.Error.WriteLine("AnyTLS is not reported as sing-box-only, so it would be generated as v2ray JSON");
+                failures++;
+            }
+            if (SingboxConfigHandler.IsSingboxOnly(EConfigType.VMess))
+            {
+                Console.Error.WriteLine("VMess is reported as sing-box-only, which would break every existing v2ray profile");
+                failures++;
+            }
+
             Console.WriteLine(failures == 0
-                ? $"generated {cases.Count} configurations, {failures} failures"
-                : $"{failures} generation failures");
+                ? $"generated {cases.Count} configurations, routing checks passed, {failures} failures"
+                : $"{failures} failures");
             return failures == 0 ? 0 : 1;
         }
     }

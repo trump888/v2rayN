@@ -25,6 +25,15 @@ namespace v2rayN.Handler
         private const string _tag = "SingboxConfigHandler";
 
         /// <summary>
+        /// True for protocol types that no v2ray/Xray core can speak, so the
+        /// v2ray generator must not be used for them. Keep in sync with
+        /// <see cref="GenOutbound"/>, which is the only outbound shape implemented
+        /// so far.
+        /// </summary>
+        public static bool IsSingboxOnly(EConfigType configType)
+            => configType == EConfigType.AnyTLS;
+
+        /// <summary>
         /// Build a complete sing-box configuration for a single server.
         /// </summary>
         /// <returns>0 on success.</returns>
