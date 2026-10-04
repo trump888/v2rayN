@@ -30,7 +30,7 @@
     The removal is done on the copy lists *and* as a post-build delete. The
     copy-list filters are the correct fix, but which item group the SDK puts an
     RID-less runtimes/** asset in depends on the SDK version, and a wrong item
-    group name is silently a no-op rather than an error -- so the delete is
+    group name is silently a no-op rather than an error, so the delete is
     there to make the outcome deterministic regardless.
   -->
 
