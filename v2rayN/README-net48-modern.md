@@ -11,7 +11,7 @@ artifacts, app payload only (no cores):
 
 | | 5.39 (this branch) | `net48-port-2026.10` |
 | --- | --- | --- |
-| app payload | **15.9 MB** | 35.2 MB |
+| app payload | **~25 MB** | 35.2 MB |
 | projects | 1 WPF + 1 WinForms | WPF + ServiceLib + AmazTool + UdpTest |
 | JSON | Newtonsoft.Json 13.0.1 | System.Text.Json 10 + 4 polyfill assemblies |
 | logging | log4net 2.0.15 | NLog 6.2.1 |
@@ -59,30 +59,67 @@ Now carried over:
   does not exist here.
 - **SkiaSharp trimming.** There is no SkiaSharp.
 
-## The x86 gRPC native: -9.5 MB
+## x86 and x64 are both shipped
 
 `Grpc.Core` ships its native transport per architecture under
-`runtimes/win/<arch>/native/`. With no `RuntimeIdentifier` (this solution is
-`AnyCPU`) the SDK copies every one, so the artifact carried both:
+`runtimes/win/<arch>/native/`. The solution is `AnyCPU`, so both are needed and
+both are present:
 
 ```
 grpc_csharp_ext.x64.dll   12.10 MB
-grpc_csharp_ext.x86.dll    9.52 MB   <- 36% of the output, never loadable in a 64-bit process
+grpc_csharp_ext.x86.dll    9.52 MB
 ```
 
-Removed in `v2rayN/Directory.Build.targets`, which filters the copy lists and also
-deletes post-build. The delete is deliberate: which item group an RID-less
-`runtimes/**` asset lands in varies by SDK version, and a wrong item name is a
-silent no-op rather than an error. (MSBuild did confirm the filter targets the
-right group — `RuntimeCopyLocalItems` — when a metadata-syntax mistake in it
-surfaced as MSB4096.)
+An earlier revision of this branch deleted the x86 copy to save 9.5 MB (36% of the
+output), on the reasoning that `AnyCPU` produces a 64-bit process on any 64-bit
+Windows. **That was wrong** — `AnyCPU` also has to work on 32-bit Windows, and
+without the x86 native the traffic-statistics feature (`Handler/StatisticsHandler`
+and friends, which speak gRPC over it) fails there. It was restored.
 
-**Trade-off:** this makes the artifact effectively **x64-only**. A 32-bit Windows
-process would no longer find the native, and the traffic-statistics feature
-(which speaks gRPC over it — `Handler/StatisticsHandler`, `Handler/V2rayConfigHandler`)
-would fail there. 32-bit Windows is a small minority and the sibling branch is
-already x64-only, so the two behave consistently. Deleting
-`v2rayN/Directory.Build.targets` reverts it.
+The file *is* never loaded by a 64-bit process, which is what makes it look
+removable, so the verification step now lists **both** natives as required. That
+turns "we ship x86" from an accident into something a build failure would catch.
+The 22 MB size budget went back to 27 MB for the same reason.
+
+If x86 support is ever dropped deliberately, delete both natives from
+`$required` and lower the budget in the same commit.
+
+## Protocol and core coverage has NOT kept up
+
+Measured by comparing `EConfigType` and `ECoreType` against `net48-port-2026.10`.
+
+**Protocols (`EConfigType`).** 5.39 has: VMess, Custom, Shadowsocks, Socks, VLESS,
+Trojan, Hysteria2, TUIC, WireGuard, HTTP, Mieru. 7.x additionally has:
+
+| Missing in 5.39 | Notes |
+| --- | --- |
+| `Anytls` | AnyTLS protocol; sing-box/mihomo support it |
+| `MASQUE` | Cloudflare's QUIC-based proxy |
+| `Naive` | 5.39 ships `naiveproxy` as a core but has no `Naive` config type, so it cannot be configured through the UI as the newer version can |
+| `Outbound` | sing-box outbound-style profiles |
+| `PolicyGroup`, `ProxyChain` | 5.x-era profile grouping/chain UI |
+
+And 5.39 has one the newer version dropped: **`Mieru`**.
+
+**Cores.** 5.39 configures: v2fly, v2fly_v5, Xray, SagerNet(v2ray-core), clash,
+clashMeta, hysteria, hysteria2, naiveproxy, tuic, sing_box, mieru. 7.x adds four
+that 5.39 cannot configure at all:
+
+| Missing in 5.39 | Notes |
+| --- | --- |
+| `juicity` | |
+| `brook` | |
+| `overtls` | |
+| `shadowquic` | |
+
+5.39 carries `clash` and `SagerNet/v2ray-core`, both of which 7.x dropped because
+they are dead (see below). So the honest summary is: **the mainstream protocols
+are all there, the long tail is not.**
+
+Closing this gap means hand-porting each protocol's config generation *and* its
+share-link parser per core, plus the UI to expose it. It is not a merge; the 5.x
+UI has no equivalent of the newer profile editor. Treated as its own piece of
+work, not a drive-by.
 
 ## Broken core repositories — needs a product decision
 

@@ -66,14 +66,18 @@ jobs:
           'NHotkey.dll',
           'NHotkey.WindowsForms.dll',
           'System.Memory.dll',
-          'grpc_csharp_ext.x64.dll'
+          # Both architectures are required. This solution is AnyCPU, so the
+          # output has to carry both gRPC natives or the traffic-statistics
+          # feature breaks wherever the other one is missing -- 32-bit Windows in
+          # particular. grpc_csharp_ext.x86.dll is 9.5 MB of the ~25 MB output and
+          # is never loaded by a 64-bit process, which makes it look removable.
+          # It is not: x86 support is a requirement, so the size is the price.
+          # (The sibling net48-port-2026.10 branch is x64-only and drops it.)
+          'grpc_csharp_ext.x64.dll',
+          'grpc_csharp_ext.x86.dll'
         )
 
-        # The x86 gRPC native is deliberately not shipped: see
-        # v2rayN/Directory.Build.targets. It was 9.5 MB, 36% of the output, and
-        # unloadable in a 64-bit process.
         $forbidden = @(
-          'grpc_csharp_ext.x86.dll'
         )
 
         $missing = $required   | Where-Object { -not (Test-Path (Join-Path $binDir $_)) }
@@ -168,11 +172,12 @@ jobs:
         # Size budget. This artifact exists because it is the lightweight one;
         # a silent re-fattening is the regression this branch exists to prevent.
         # The floor is deliberately loose -- it is there to catch a new
-        # multi-megabyte native appearing, not to police small changes.
+        # multi-megabyte native appearing, not to police small changes. It sits
+        # above the x86 gRPC native on purpose: that file is wanted.
         $totalMb = (Get-ChildItem $binDir -Recurse -File | Measure-Object Length -Sum).Sum / 1MB
         Write-Host ("publish output verified: {0} required files, {1} managed assemblies bind, {2:N1} MB total" -f $required.Count, $managed.Count, $totalMb)
-        if ($totalMb -gt 22) {
-          Write-Error ("publish output is {0:N1} MB, over the 22 MB budget. If that is intended, find out what grew before raising the budget." -f $totalMb)
+        if ($totalMb -gt 27) {
+          Write-Error ("publish output is {0:N1} MB, over the 27 MB budget. If that is intended, find out what grew before raising the budget." -f $totalMb)
           Get-ChildItem $binDir -File | Sort-Object Length -Descending | Select-Object -First 10 Name, Length
           exit 1
         }
