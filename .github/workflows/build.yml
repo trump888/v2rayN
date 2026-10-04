@@ -213,6 +213,56 @@ jobs:
           Write-Warning "$bad of $($repos.Count) core repositories are gone, archived or stale. Updating them is a product decision, not a build fix -- see the branch README."
         }
 
+    # Every core the UI offers must actually be registered, and its download
+    # URLs must use the names the project actually publishes today.
+    #
+    # This catches a failure mode the repository-liveness check cannot: a core can
+    # sit in a perfectly healthy repository and still be broken. That is exactly
+    # what happened here in two ways -- "mihomo" was offered in the UI dropdown but
+    # had no CoreInfo registered at all, and "clash_meta" downloaded fine (GitHub
+    # redirects MetaCubeX/Clash.Meta to MetaCubeX/mihomo) while its
+    # "Clash.Meta-*" exe names stopped matching "mihomo-windows-amd64.exe", so
+    # the binary was never found. Both compile, both run, both fail on click.
+    - name: Verify offered cores are registered
+      shell: pwsh
+      run: |
+        $globals  = Get-Content v2rayN/v2rayN/Global.cs -Raw
+        $lazy     = Get-Content v2rayN/v2rayN/Handler/LazyConfig.cs -Raw
+
+        $offered = [regex]::Match($globals, 'coreTypes\s*=\s*new List<string>\s*\{(?<body>[^}]*)\}').Groups['body'].Value |
+                  ForEach-Object { [regex]::Matches($_, '"([^"]+)"') } | ForEach-Object { $_.Groups[1].Value }
+        $registered = [regex]::Matches($lazy, 'coreType\s*=\s*ECoreType\.(?<n>\w+)') | ForEach-Object { $_.Groups['n'].Value } |
+                      Sort-Object -Unique
+
+        Write-Host "offered to the UI : $($offered.Count)"
+        Write-Host "registered        : $($registered.Count)"
+
+        $errors = @()
+        foreach ($c in $offered) {
+          if ($registered -notcontains $c) {
+            $errors += "'$c' is offered in Global.coreTypes but has no CoreInfo registration in LazyConfig"
+          }
+        }
+        if ($errors) {
+          $errors | ForEach-Object { Write-Host "  $_" }
+          Write-Error "offered cores that are not registered"
+          exit 1
+        }
+
+        # mihomo's exe name is the one that has to match what the repo publishes;
+        # check it against the release asset we know ships.
+        if ($offered -contains 'mihomo') {
+          $mihomoExe = [regex]::Match($lazy, 'ECoreType\.mihomo[\s\S]{0,600}?coreExes\s*=\s*new List<string>\s*\{(?<b>[^}]*)\}')
+          if (-not $mihomoExe.Success) { Write-Error "could not find the mihomo coreExes list"; exit 1 }
+          if ($mihomoExe.Groups['b'].Value -notmatch 'mihomo-windows-amd64') {
+            Write-Error "mihomo coreExes does not list mihomo-windows-amd64, which is the exe the current release publishes"
+            exit 1
+          }
+          Write-Host "  mihomo exe names match the current release asset"
+        }
+
+        Write-Host "all offered cores are registered"
+
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:

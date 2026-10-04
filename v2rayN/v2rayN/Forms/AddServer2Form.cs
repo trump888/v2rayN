@@ -19,15 +19,11 @@ namespace v2rayN.Forms
 
         private void AddServer2Form_Load(object sender, EventArgs e)
         {
-            List<string> coreTypes = new List<string>();
-            foreach (ECoreType it in Enum.GetValues(typeof(ECoreType)))
-            {
-                if (it == ECoreType.v2rayN)
-                    continue;
-                coreTypes.Add(it.ToString());
-            }
-
-            cmbCoreType.Items.AddRange(coreTypes.ToArray());
+            // Was Enum.GetValues(typeof(ECoreType)), which offered every value
+            // including cores whose project no longer exists and one (mihomo) that
+            // was never registered. Global.coreTypes is the curated list and is
+            // what the other dropdowns use.
+            cmbCoreType.Items.AddRange(Global.coreTypes.ToArray());
             cmbCoreType.Items.Add(string.Empty);
 
             txtAddress.ReadOnly = true;

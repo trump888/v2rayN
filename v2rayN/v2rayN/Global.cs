@@ -17,6 +17,12 @@ namespace v2rayN
         public const string NUrl = @"https://github.com/2dust/v2rayN/releases";
         public const string clashCoreUrl = "https://github.com/Dreamacro/clash/releases";
         public const string clashMetaCoreUrl = "https://github.com/MetaCubeX/Clash.Meta/releases";
+        // MetaCubeX/Clash.Meta was renamed to MetaCubeX/mihomo. GitHub redirects
+        // the old name, so a download still succeeds -- but the archive now
+        // contains mihomo-windows-amd64.exe, which none of the Clash.Meta-*
+        // names in CoreInfo match. So the old entry silently stops finding its
+        // exe. Use the current name and the current asset names.
+        public const string mihomoCoreUrl = "https://github.com/MetaCubeX/mihomo/releases";
         public const string hysteriaCoreUrl = "https://github.com/HyNetwork/hysteria/releases";
         public const string naiveproxyCoreUrl = "https://github.com/klzgrad/naiveproxy/releases";
         public const string tuicCoreUrl = "https://github.com/EAimTY/tuic/releases";
@@ -226,7 +232,29 @@ namespace v2rayN
         public static readonly List<string> xtlsFlows = new List<string> { "", "xtls-rprx-origin", "xtls-rprx-origin-udp443", "xtls-rprx-direct", "xtls-rprx-direct-udp443", "xtls-rprx-vision", "xtls-rprx-vision-udp443" };
         public static readonly List<string> networks = new List<string> { "tcp", "kcp", "ws", "h2", "quic", "grpc" };
         public static readonly List<string> kcpHeaderTypes = new List<string> { "srtp", "utp", "wechat-video", "dtls", "wireguard" };
-        public static readonly List<string> coreTypes = new List<string> { "v2fly", "SagerNet", "Xray", "v2fly_v5", "mihomo", "clash", "clash_meta", "sing_box", "hysteria", "hysteria2", "naiveproxy", "tuic", "mieru" };
+        /// <summary>
+        /// The core types offered in the UI, and the single source of truth for
+        /// that: AddServer2Form used to build its own list from
+        /// Enum.GetValues(typeof(ECoreType)), which meant the two dropdowns
+        /// disagreed.
+        ///
+        /// Only cores whose project still exists are listed:
+        ///   SagerNet  -> SagerNet/v2ray-core, last push 2022-07-30. The
+        ///                maintained fork v2fly/v2ray-core is already here as
+        ///                v2fly / v2fly_v5.
+        ///   clash     -> Dreamacro/clash, repository deleted (404).
+        ///                Successor mihomo is here instead.
+        ///   clash_meta-> superseded by mihomo, and its Clash.Meta-* exe names no
+        ///                longer match what the repo publishes.
+        ///   mieru     -> zzzgydi/mieru, repository deleted (404).
+        ///
+        /// Removed from the UI, NOT from ECoreType: those enum values are
+        /// persisted in existing server configurations and renumbering them would
+        /// silently repoint every saved profile. The CoreInfo registrations stay
+        /// too, so an exe already downloaded under one of these names keeps
+        /// working for a configuration that still references it.
+        /// </summary>
+        public static readonly List<string> coreTypes = new List<string> { "v2fly", "Xray", "v2fly_v5", "mihomo", "sing_box", "hysteria", "hysteria2", "naiveproxy", "tuic" };
         public static readonly List<string> domainMatchers = new List<string> { "linear", "mph", "" };
         public static readonly List<string> fingerprints = new List<string> { "chrome", "firefox", "safari", "randomized", "" };
         public static readonly List<string> domainStrategy4Freedoms = new List<string> { "AsIs", "UseIP", "UseIPv4", "UseIPv6", "" };

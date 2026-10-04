@@ -121,20 +121,37 @@ share-link parser per core, plus the UI to expose it. It is not a merge; the 5.x
 UI has no equivalent of the newer profile editor. Treated as its own piece of
 work, not a drive-by.
 
-## Broken core repositories — needs a product decision
+## Broken cores — found, and mostly fixed
 
-The liveness check reports these on every build. They are **not** build fixes:
-which cores this app should offer is a judgement call.
+The liveness check reports these on every build. The first survey found more
+than it first looked, because a core can be broken in ways a green repository
+says nothing about.
 
-| Repository | Status |
-| --- | --- |
-| `Dreamacro/clash` | **404, deleted.** Successor is `MetaCubeX/mihomo`, already present |
-| `zzzgydi/mieru` | **404, deleted** |
-| `SagerNet/v2ray-core` | last push **2022-07-30**. Maintained fork is `v2fly/v2ray-core`, already present |
+| Core | Problem | Resolution |
+| --- | --- | --- |
+| `Dreamacro/clash` | repository deleted (404) | removed from the UI |
+| `zzzgydi/mieru` | repository deleted (404) | removed from the UI |
+| `SagerNet/v2ray-core` | last push 2022-07-30; `v2fly/v2ray-core` already offered | removed from the UI |
+| **`mihomo`** | **was offered in the UI but had no `CoreInfo` registered at all** — selecting it could not resolve a core | now registered, with current asset and exe names |
+| **`clash_meta`** | downloaded *successfully* (GitHub redirects `Clash.Meta` → `mihomo`) but its `Clash.Meta-*` exe names no longer match the `mihomo-windows-amd64.exe` the repo publishes, so the binary was never found | superseded by `mihomo`; removed from the UI |
 
-So of the three, two have maintained successors already wired up in `Global.cs`.
-The likely resolution is to drop the three dead entries rather than repoint them,
-but that removes functionality from the UI and should be an explicit decision.
+That last two are the interesting ones: both compile, both run, and both only
+fail when a user clicks. A repository-liveness check cannot see either.
+
+`ECoreType` values are **not** renumbered — they are persisted in existing server
+configurations, so renumbering would silently repoint every saved profile. The
+dead enum values and their `CoreInfo` registrations are kept, so an exe already
+downloaded under one of those names keeps working for a profile that still
+references it. Only the UI lists changed.
+
+`Global.coreTypes` is now the single source of truth for what the UI offers.
+`AddServer2Form` used to build a second list from
+`Enum.GetValues(typeof(ECoreType))`, which is why the two dropdowns disagreed and
+why `mihomo` could appear in one and not the other.
+
+A new CI step, `Verify offered cores are registered`, asserts every offered core
+has a `CoreInfo` and that mihomo's exe name matches what the current release
+actually publishes.
 
 ## Honest note on "following the new version"
 
