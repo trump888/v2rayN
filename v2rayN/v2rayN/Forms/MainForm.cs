@@ -1427,9 +1427,21 @@ namespace v2rayN.Forms
 
         // Both were Dreamacro/clash (404) and MetaCubeX/Clash.Meta (no longer ships a
         // Clash.Meta-* executable). Their registrations are gone, so calling
-        // CheckUpdateCore with them resolved to no CoreInfo. mihomo is the successor
-        // for both. One handler rather than two, because there is one core now.
+        // CheckUpdateCore with them resolved to no CoreInfo -- GetCoreInfo returns
+        // null. mihomo is the successor for both.
+        //
+        // Both menu items are kept and both now update mihomo, because their labels
+        // come from resources.ApplyResources and removing one means editing the
+        // neutral and zh-Hans resx as well as the designer. Two entries doing the
+        // same thing is a cosmetic wart; the alternative is a dangling event handler
+        // or a localization edit for no functional gain. Worth collapsing to one
+        // entry if the menu is ever touched.
         private void tsbCheckUpdateClashCore_Click(object sender, EventArgs e)
+        {
+            CheckUpdateCore(ECoreType.mihomo);
+        }
+
+        private void tsbCheckUpdateClashMetaCore_Click(object sender, EventArgs e)
         {
             CheckUpdateCore(ECoreType.mihomo);
         }
