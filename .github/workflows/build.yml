@@ -461,17 +461,18 @@ jobs:
         # commits ahead of v1.14.2, so the release every user installs rejects it.
         # Skip only that one file here and check it in the master-build step below,
         # rather than failing the build on a config that is correct but unreleased.
-        $masque = Join-Path $gen 'masque.json'
-        $skipMasque = $false
-        if (Test-Path $masque) {
-          Write-Host "  skip   masque.json here (no released sing-box has it); checked separately below"
-          $skipMasque = $true
+        # Every generated file whose name marks it as MASQUE, not just one: the
+        # round-trip test also writes rt-masque.json. None of these can be checked
+        # against a release; they go to the nightly check below instead.
+        $masqueFiles = @(Get-ChildItem $gen -Filter *.json -File | Where-Object { $_.Name -match 'masque' })
+        if ($masqueFiles.Count -gt 0) {
+          Write-Host "  skip   $($masqueFiles.Name -join ', ') here (no released sing-box has MASQUE); checked below"
         }
 
         $bad = 0
         $count = 0
         foreach ($f in Get-ChildItem $gen -Filter *.json) {
-          if ($skipMasque -and $f.FullName -eq $masque) { continue }
+          if ($masqueFiles.FullName -contains $f.FullName) { continue }
           $count++
           $out = & $sb.FullName check -c $f.FullName 2>&1
           if ($LASTEXITCODE -ne 0) {
@@ -494,8 +495,8 @@ jobs:
         #
         # binary-windows_amd64-legacy-windows-7 is deliberate: it is the Win7-capable
         # build, which is the point of this branch.
-        if (-not (Test-Path $masque)) {
-          Write-Host "no masque.json was produced by the checker; nothing to validate"
+        if ($masqueFiles.Count -eq 0) {
+          Write-Host "no MASQUE configurations were produced; nothing to validate"
           return
         }
         Write-Host "looking for a sing-box nightly with MASQUE"
@@ -549,13 +550,15 @@ jobs:
 
         $vout = & $sbExe.FullName version
         Write-Host "built: $($vout -join ' ')"
-        $mout = & $sbExe.FullName check -c $masque 2>&1
-        if ($LASTEXITCODE -ne 0) {
-          Write-Error "masque.json was rejected by the sing-box nightly:"
-          $mout | Select-Object -First 10 | ForEach-Object { Write-Host "  $_" }
-          exit 1
+        foreach ($mf in $masqueFiles) {
+          $mout = & $sbExe.FullName check -c $mf.FullName 2>&1
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "$($mf.Name) was rejected by the sing-box nightly:"
+            $mout | Select-Object -First 10 | ForEach-Object { Write-Host "  $_" }
+            exit 1
+          }
+          Write-Host "  valid   $($mf.Name) (accepted by a prebuilt sing-box nightly)"
         }
-        Write-Host "  valid   masque.json (accepted by a prebuilt sing-box nightly)"
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
