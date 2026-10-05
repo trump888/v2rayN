@@ -346,7 +346,12 @@ namespace SingboxConfigCheck
                 }
                 else
                 {
-                    Check(!json.Contains("\"username\""), $"naive ({label}) omits username when none was given");
+                    // Empty rather than absent. A naive outbound with a password and
+                    // no username key at all passes `sing-box check` but the Windows
+                    // build refuses to start on it -- which only the runtime smoke
+                    // step caught, not check.
+                    Check(json.Contains("\"username\": \"\""),
+                          $"naive ({label}) emits an empty username rather than omitting it");
                 }
                 Check(json.Contains($"\"password\": \"{expectedPass.Replace("@", "@")}\""), $"naive ({label}) sets password '{expectedPass}'");
             }
