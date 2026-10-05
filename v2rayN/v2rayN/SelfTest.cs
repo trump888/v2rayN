@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using v2rayN.Base;
 using v2rayN.Handler;
@@ -27,22 +28,83 @@ namespace v2rayN
     /// </summary>
     internal static class SelfTest
     {
+        private const int ATTACH_PARENT_PROCESS = -1;
+        private const int ATTACH_PROCESS_DETACH = -2; // already attached
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool AttachConsole(int dwProcessId);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool AllocConsole();
+
         private static readonly List<string> _failures = new();
+        private static readonly StringBuilder _log = new();
         private static int _passed;
+
+        /// <summary>
+        /// v2rayN.exe is a WinExe, so it has no console of its own and
+        /// Console.WriteLine is thrown away. Attach to the shell's console when there
+        /// is one, so running it from a prompt prints; and always mirror everything to
+        /// a report file, so double-clicking it still leaves something readable
+        /// instead of a window that flashes and exits.
+        /// </summary>
+        private static void EnsureConsole()
+        {
+            if (!AttachConsole(ATTACH_PARENT_PROCESS) && !AttachConsole(ATTACH_PROCESS_DETACH))
+            {
+                try { AllocConsole(); } catch { /* nothing we can do */ }
+            }
+            try
+            {
+                var stdout = Console.OpenStandardOutput();
+                if (stdout != Stream.Null)
+                {
+                    Console.SetOut(new StreamWriter(stdout, new UTF8Encoding(false)) { AutoFlush = true });
+                }
+            }
+            catch
+            {
+                // No console available. The report file is the fallback.
+            }
+        }
+
+        private static void Say(string line)
+        {
+            _log.AppendLine(line);
+            try { Console.WriteLine(line); } catch { /* console gone */ }
+        }
 
         public static int Run()
         {
-            Console.OutputEncoding = Encoding.UTF8;
-            Console.WriteLine("v2rayN net48 self test");
-            Console.WriteLine(new string('=', 60));
+            EnsureConsole();
+
+            // A report file is written unconditionally, first, so it exists even if
+            // something below throws.
+            var reportPath = Path.Combine(Utils.StartupPath(), "selftest-report.txt");
+            void Finish(int code)
+            {
+                try
+                {
+                    Directory.CreateDirectory(Path.GetDirectoryName(reportPath)!);
+                    File.WriteAllText(reportPath, _log.ToString(), new UTF8Encoding(false));
+                    Console.WriteLine();
+                    Console.WriteLine($"report written to {reportPath}");
+                }
+                catch { }
+                Environment.Exit(code);
+            }
+
+            Say("v2rayN net48 self test");
+            Say(new string('=', 60));
 
             Environment_();
             SampleProfiles();
             ShareLinkRoundTrips();
             Validation_();
             Generation();
+            Report();
 
-            Console.WriteLine(new string('=', 60));
+            Say(new string('=', 60));
             if (_failures.Count == 0)
             {
                 Console.WriteLine($"PASS  {_passed} checks, 0 failures");
@@ -61,12 +123,12 @@ namespace v2rayN
             if (ok)
             {
                 _passed++;
-                Console.WriteLine($"  ok    {what}");
+                Say($"  ok    {what}");
             }
             else
             {
                 _failures.Add(what);
-                Console.WriteLine($"  FAIL  {what}");
+                Say($"  FAIL  {what}");
             }
         }
 
@@ -77,13 +139,13 @@ namespace v2rayN
         /// </summary>
         private static void Environment_()
         {
-            Console.WriteLine();
-            Console.WriteLine("-- environment --");
-            Console.WriteLine($"  os            {Environment.OSVersion} ({(Environment.Is64BitOperatingSystem ? "x64" : "x86")})");
-            Console.WriteLine($"  runtime       {Environment.Version}, .NET {Environment.Version}");
-            Console.WriteLine($"  process       {(Environment.Is64BitProcess ? "x64" : "x86")}");
-            Console.WriteLine($"  exe version   {Utils.GetVersion()}");
-            Console.WriteLine($"  startup path  {Utils.StartupPath()}");
+            Say("");
+            Say("-- environment --");
+            Say($"  os            {Environment.OSVersion} ({(Environment.Is64BitOperatingSystem ? "x64" : "x86")})");
+            Say($"  runtime       {Environment.Version}, .NET {Environment.Version}");
+            Say($"  process       {(Environment.Is64BitProcess ? "x64" : "x86")}");
+            Say($"  exe version   {Utils.GetVersion()}");
+            Say($"  startup path  {Utils.StartupPath()}");
 
             Check(Environment.OSVersion.Version.Major >= 6, "OS version is Vista or newer");
             Check(Environment.Is64BitOperatingSystem, "64-bit OS");
@@ -95,7 +157,7 @@ namespace v2rayN
             {
                 using var g = System.Drawing.Graphics.FromHwnd(IntPtr.Zero);
                 var dpi = g.DpiX;
-                Console.WriteLine($"  dpi           {dpi} x {g.DpiY}");
+                Say($"  dpi           {dpi} x {g.DpiY}");
                 Check(dpi > 0, "a usable DPI was reported");
             }
             catch (Exception ex)
@@ -110,8 +172,8 @@ namespace v2rayN
         /// </summary>
         private static List<(string Name, VmessItem Item)> SampleProfiles()
         {
-            Console.WriteLine();
-            Console.WriteLine("-- sample profiles --");
+            Say("");
+            Say("-- sample profiles --");
             var priv = Convert.ToBase64String(Enumerable.Repeat((byte)0x11, 32).ToArray());
             var pub = Convert.ToBase64String(Enumerable.Repeat((byte)0x22, 32).ToArray());
 
@@ -147,15 +209,15 @@ namespace v2rayN
 
             foreach (var (name, _) in profiles)
             {
-                Console.WriteLine($"  profile {name}");
+                Say($"  profile {name}");
             }
             return profiles;
         }
 
         private static void ShareLinkRoundTrips()
         {
-            Console.WriteLine();
-            Console.WriteLine("-- share link round trips --");
+            Say("");
+            Say("-- share link round trips --");
             foreach (var (name, item) in SampleProfiles())
             {
                 var url = ShareHandler.GetShareUrl(item);
@@ -176,8 +238,8 @@ namespace v2rayN
 
         private static void Validation_()
         {
-            Console.WriteLine();
-            Console.WriteLine("-- validation catches what used to fail silently --");
+            Say("");
+            Say("-- validation catches what used to fail silently --");
             var noRealityKey = new VmessItem
             {
                 configType = EConfigType.VLESS,
@@ -201,10 +263,29 @@ namespace v2rayN
             }
         }
 
+        /// <summary>
+        /// Configuration output goes to ./selftest; a summary of it also belongs in the
+        /// report file so someone reading the report after the fact can see what was
+        /// produced without opening the folder.
+        /// </summary>
+        private static void Report()
+        {
+            var dir = Path.Combine(Utils.StartupPath(), "selftest");
+            if (!Directory.Exists(dir))
+            {
+                return;
+            }
+            foreach (var f in Directory.GetFiles(dir, "*.json").OrderBy(x => x))
+            {
+                var fi = new FileInfo(f);
+                Say($"  wrote      {Path.GetFileName(f),-24} {fi.Length,7} bytes");
+            }
+        }
+
         private static void Generation()
         {
-            Console.WriteLine();
-            Console.WriteLine("-- config generation --");
+            Say("");
+            Say("-- config generation --");
             var outDir = Path.Combine(Utils.StartupPath(), "selftest");
             Directory.CreateDirectory(outDir);
             foreach (var (name, item) in SampleProfiles())
@@ -220,7 +301,7 @@ namespace v2rayN
                     : V2rayConfigHandler.GenerateClientConfig(item, file, out _, out _) == 0;
                 Check(rc && File.Exists(file) && new FileInfo(file).Length > 0, $"{name}: a config was written");
             }
-            Console.WriteLine($"  configs in   {outDir}");
+            Say($"  configs in   {outDir}");
         }
     }
 }

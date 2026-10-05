@@ -338,9 +338,19 @@ jobs:
         $exe = Get-ChildItem 'v2rayN/v2rayN/bin/Release' -Recurse -Filter 'v2rayN.exe' -File |
                Select-Object -First 1
         if (-not $exe) { throw "v2rayN.exe not built" }
-        $out = & $exe.FullName --selftest 2>&1
+        # A WinExe has no console of its own; SelfTest attaches to the parent one and
+        # always writes selftest-report.txt as well. Read the report rather than
+        # trusting the stream, so the log is captured either way.
+        $report = Join-Path $exe.DirectoryName 'selftest-report.txt'
+        Remove-Item $report -Force -ErrorAction SilentlyContinue
+        & $exe.FullName --selftest | Out-Null
         $code = $LASTEXITCODE
-        $out | ForEach-Object { Write-Host $_ }
+        if (Test-Path $report) {
+          Get-Content $report | ForEach-Object { Write-Host $_ }
+        } else {
+          Write-Error "--selftest wrote no report and exited with $code"
+          exit 1
+        }
         if ($code -ne 0) { throw "--selftest failed with exit code $code" }
         Remove-Item (Join-Path $exe.DirectoryName 'selftest') -Recurse -Force -ErrorAction SilentlyContinue
 
