@@ -348,24 +348,33 @@ jobs:
         $headers = @{ 'User-Agent' = 'v2rayN-net48-check' }
         if ($env:GITHUB_TOKEN) { $headers['Authorization'] = "Bearer $env:GITHUB_TOKEN" }
 
+        # Runs older than the MASQUE commit cannot contain it, so require that.
+        # This also makes the selection deterministic: the API does not promise an
+        # ordering across the pagination, and a run whose artifacts were expired or
+        # unreadable was previously skipped in a way that silently walked backwards
+        # to a pre-MASQUE build and then failed the step.
+        $masqueCommit = [datetime]::Parse('2026-09-21T00:00:00Z').ToUniversalTime()
         $nightly = $null
-        for ($i = 0; $i -lt 10 -and -not $nightly; $i++) {
-          $runs = Invoke-RestMethod 'https://api.github.com/repos/SagerNet/sing-box/actions/workflows/build.yml/runs?branch=testing&per_page=10&status=success' -Headers $headers
-          foreach ($r in $runs.workflow_runs) {
+        $runs = Invoke-RestMethod 'https://api.github.com/repos/SagerNet/sing-box/actions/workflows/build.yml/runs?branch=testing&per_page=20&status=success' -Headers $headers
+        foreach ($r in ($runs.workflow_runs | Sort-Object created_at -Descending)) {
+          if ([datetime]::Parse($r.created_at).ToUniversalTime() -lt $masqueCommit) { break }
+          try {
             $arts = Invoke-RestMethod "https://api.github.com/repos/SagerNet/sing-box/actions/runs/$($r.id)/artifacts" -Headers $headers
-            $a = $arts.artifacts | Where-Object { $_.name -eq 'binary-windows_amd64-legacy-windows-7' -and -not $_.expired } | Select-Object -First 1
-            if ($a) { $nightly = [pscustomobject]@{ Run = $r; Artifact = $a }; break }
+          } catch {
+            Write-Host "  could not list artifacts for run $($r.id): $($_.Exception.Message)"
+            continue
           }
-          if (-not $nightly) { Start-Sleep -Seconds 10 }
+          $a = $arts.artifacts | Where-Object { $_.name -eq 'binary-windows_amd64-legacy-windows-7' -and -not $_.expired } | Select-Object -First 1
+          if ($a) { $nightly = [pscustomobject]@{ Run = $r; Artifact = $a }; break }
         }
         if (-not $nightly) {
           # Do not fail the build over this: the config is already covered by the
-          # structural assertions above, and sing-box's own CI is the source of truth
-          # for whether MASQUE is still in their tree.
+          # structural assertions above, and whether MASQUE is still in sing-box's
+          # tree is sing-box's CI to decide, not this build's.
           Write-Warning "could not find a sing-box nightly with MASQUE; skipping the runtime check (shape is asserted structurally above)"
           return
         }
-        Write-Host "using sing-box nightly from run $($nightly.Run.id) ($($nightly.Run.head_sha.Substring(0,9)), $($nightly.Run.created_at)"
+        Write-Host "using sing-box nightly from run $($nightly.Run.id) ($($nightly.Run.head_sha.Substring(0,9)), $($nightly.Run.created_at))"
 
         $zipPath = Join-Path $env:RUNNER_TEMP 'sb-nightly.zip'
         Invoke-WebRequest "https://api.github.com/repos/SagerNet/sing-box/actions/artifacts/$($nightly.Artifact.id)/zip" `
