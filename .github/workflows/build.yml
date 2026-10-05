@@ -836,21 +836,45 @@ jobs:
         if (-not (Test-Path $clientCfg)) { throw 'e2e client config was not produced' }
 
         # A local origin to fetch, so the relay has somewhere real to go.
+        # A raw TcpListener rather than HttpListener: HttpListener needs a URL ACL
+        # reservation for its prefix and throws without one, which is a property of
+        # the runner session rather than anything the test can fix. TcpListener needs
+        # nothing.
         $origin = Start-Job -ScriptBlock {
           param($port, $body)
-          $l = [System.Net.HttpListener]::new()
-          $l.Prefixes.Add("http://127.0.0.1:$port/")
+          $l = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, $port)
           $l.Start()
-          while ($l.IsListening) {
-            try {
-              $ctx = $l.GetContext()
-              $bytes = [System.Text.Encoding]::UTF8.GetBytes($body)
-              $ctx.Response.ContentLength64 = $bytes.Length
-              $ctx.Response.OutputStream.Write($bytes, 0, $bytes.Length)
-              $ctx.Response.Close()
-            } catch { break }
-          }
+          try {
+            while ($true) {
+              $c = $l.AcceptTcpClient()
+              try {
+                $s = $c.GetStream()
+                $buf = New-Object byte[] 4096
+                [void]$s.Read($buf, 0, $buf.Length)   # request line is enough
+                $bytes = [System.Text.Encoding]::UTF8.GetBytes($body)
+                $head = "HTTP/1.1 200 OK`r`nContent-Type: text/plain`r`nContent-Length: $($bytes.Length)`r`nConnection: close`r`n`r`n"
+                $headBytes = [System.Text.Encoding]::ASCII.GetBytes($head)
+                $s.Write($headBytes, 0, $headBytes.Length)
+                $s.Write($bytes, 0, $bytes.Length)
+                $s.Flush()
+              } catch { } finally { $c.Close() }
+            }
+          } finally { $l.Stop() }
         } -ArgumentList $originPort, $payload
+        # Give the listener a moment to bind before anything connects to it.
+        $ready = $false
+        foreach ($try in 1..20) {
+          try {
+            $probe = [System.Net.Sockets.TcpClient]::new()
+            $probe.Connect('127.0.0.1', $originPort)
+            $probe.Close()
+            $ready = $true
+            break
+          } catch { Start-Sleep -Milliseconds 250 }
+        }
+        if (-not $ready) {
+          Write-Warning 'origin listener did not come up; the relayed request will likely fail'
+        }
 
         $server = Start-Process -FilePath $sb -ArgumentList @('run', '-c', $serverCfgPath) -PassThru -WindowStyle Hidden `
                   -RedirectStandardOutput (Join-Path $work 'srv.out') -RedirectStandardError (Join-Path $work 'srv.err')
