@@ -186,9 +186,8 @@ jobs:
     # core repositories as constants; some of those have moved or been deleted
     # since. A green build says nothing about them, and a dead URL only shows up
     # as a 404 when a user tries to update that core.
-    - name: Check core repositories (informational)
+    - name: Check core repositories and asset names
       shell: pwsh
-      continue-on-error: true
       run: |
         $ProgressPreference = 'SilentlyContinue'
         $globals = Get-Content v2rayN/v2rayN/Global.cs -Raw
@@ -211,6 +210,39 @@ jobs:
         }
         if ($bad -gt 0) {
           Write-Warning "$bad of $($repos.Count) core repositories are gone, archived or stale. Updating them is a product decision, not a build fix -- see the branch README."
+        }
+
+        # A live repository says nothing about whether the asset name in a CoreInfo
+        # still matches what the release publishes. clash_meta was exactly that:
+        # MetaCubeX/Clash.Meta redirects to MetaCubeX/mihomo, downloads succeeded, and
+        # the archive contained mihomo-windows-amd64.exe while the CoreInfo listed
+        # Clash.Meta-*. So assert the Windows asset names themselves.
+        $expectAssets = @{
+          'juicity/juicity'            = 'juicity-windows-x86_64.zip'
+          'txthinking/brook'            = 'brook_windows_amd64.exe'
+          'ShadowsocksR-Live/overtls'  = 'overtls-x86_64-win7-windows-msvc.zip'
+          'spongebob888/shadowquic'    = 'shadowquic-x86_64-windows.exe'
+          'MetaCubeX/mihomo'           = 'mihomo-windows-amd64'
+        }
+        foreach ($r in $expectAssets.Keys) {
+          try {
+            $rel = Invoke-RestMethod 'https://api.github.com/repos/' + $r + '/releases/latest' -Headers $headers
+            $tag = $rel.tag_name
+            $found = $false
+            foreach ($a in $rel.assets) {
+              if ($a.name -like ($expectAssets[$r] + '*')) { $found = $true; break }
+            }
+            if ($found) {
+              Write-Host ("  ok       {0,-30} {1} has {2} ({3})" -f $r, $tag, $expectAssets[$r], 'latest')
+            } else {
+              $names = ($rel.assets | Select-Object -First 8 -ExpandProperty name) -join ', '
+              Write-Error "$r ($tag) does not publish an asset matching '$($expectAssets[$r])'. Its Windows assets look like: $names"
+              exit 1
+            }
+          } catch {
+            Write-Error "could not check $r assets: $($_.Exception.Message)"
+            exit 1
+          }
         }
 
     # Every core the UI offers must actually be registered, and its download

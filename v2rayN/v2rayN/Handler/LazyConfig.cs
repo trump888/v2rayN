@@ -219,6 +219,70 @@ namespace v2rayN.Handler
                 redirectInfo = true,
             });
 
+            // Ports of 7.x's registrations for the four cores this fork was missing.
+            // Asset names were checked against each repository's latest release
+            // rather than copied: the repositories were all live, but clash_meta
+            // showed that a live repository says nothing about whether the exe name
+            // in a CoreInfo still matches what the release actually contains.
+            //
+            // None of these four has a config generator here or in 7.x -- they are
+            // driven by a user-supplied config file (the Custom server type), which
+            // is why their Arguments carry a {0} for the config path.
+            coreInfos.Add(new CoreInfo
+            {
+                coreType = ECoreType.juicity,
+                coreExes = new List<string> { "juicity-client", "juicity" },
+                // {0} is the config file path, substituted in V2rayHandler.
+                arguments = "run -c {0}",
+                coreUrl = Global.juicityCoreUrl,
+                coreReleaseApiUrl = Global.juicityCoreUrl.Replace(@"https://github.com", @"https://api.github.com/repos"),
+                coreDownloadUrl64 = Global.juicityCoreUrl + "/download/{0}/juicity-windows-x86_64.zip",
+                match = "",
+                versionArg = "",
+                redirectInfo = false,
+            });
+
+            coreInfos.Add(new CoreInfo
+            {
+                coreType = ECoreType.brook,
+                coreExes = new List<string> { "brook_windows_amd64", "brook" },
+                arguments = "{0}",
+                coreUrl = Global.brookCoreUrl,
+                coreReleaseApiUrl = Global.brookCoreUrl.Replace(@"https://github.com", @"https://api.github.com/repos"),
+                // published as a bare .exe, not a zip
+                coreDownloadUrl64 = Global.brookCoreUrl + "/download/{0}/brook_windows_amd64.exe",
+                match = "",
+                versionArg = "",
+                redirectInfo = false,
+            });
+
+            coreInfos.Add(new CoreInfo
+            {
+                coreType = ECoreType.overtls,
+                coreExes = new List<string> { "overtls-bin", "overtls" },
+                arguments = "-r client -c {0}",
+                coreUrl = Global.overtlsCoreUrl,
+                coreReleaseApiUrl = Global.overtlsCoreUrl.Replace(@"https://github.com", @"https://api.github.com/repos"),
+                // The -win7- variant, not -pc-, because this branch targets Windows 7.
+                coreDownloadUrl64 = Global.overtlsCoreUrl + "/download/{0}/overtls-x86_64-win7-windows-msvc.zip",
+                match = "",
+                versionArg = "",
+                redirectInfo = false,
+            });
+
+            coreInfos.Add(new CoreInfo
+            {
+                coreType = ECoreType.shadowquic,
+                coreExes = new List<string> { "shadowquic" },
+                arguments = "-c {0}",
+                coreUrl = Global.shadowquicCoreUrl,
+                coreReleaseApiUrl = Global.shadowquicCoreUrl.Replace(@"https://github.com", @"https://api.github.com/repos"),
+                coreDownloadUrl64 = Global.shadowquicCoreUrl + "/download/{0}/shadowquic-x86_64-windows.exe",
+                match = "",
+                versionArg = "",
+                redirectInfo = false,
+            });
+
             coreInfos.Add(new CoreInfo
             {
                 coreType = ECoreType.mieru,

@@ -29,6 +29,14 @@ namespace v2rayN
         public const string singboxCoreUrl = "https://github.com/SagerNet/sing-box/releases";
         public const string hysteria2CoreUrl = "https://github.com/apernet/hysteria/releases";
         public const string mieruCoreUrl = "https://github.com/zzzgydi/mieru/releases";
+        // Ports of 7.x's core registrations. Repos verified live, and the Windows
+        // asset names below checked against each repo's latest release -- the
+        // clash_meta lesson is that a live repository says nothing about whether the
+        // asset name still matches.
+        public const string juicityCoreUrl = "https://github.com/juicity/juicity/releases";
+        public const string brookCoreUrl = "https://github.com/txthinking/brook/releases";
+        public const string overtlsCoreUrl = "https://github.com/ShadowsocksR-Live/overtls/releases";
+        public const string shadowquicCoreUrl = "https://github.com/spongebob888/shadowquic/releases";
         public const string mieruProtocol = "mieru://";
         public const string tuicProtocol = "tuic://";
         public const string geoUrl = "https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/{0}.dat";
@@ -261,7 +269,8 @@ namespace v2rayN
         /// too, so an exe already downloaded under one of these names keeps
         /// working for a configuration that still references it.
         /// </summary>
-        public static readonly List<string> coreTypes = new List<string> { "v2fly", "Xray", "v2fly_v5", "mihomo", "sing_box", "hysteria", "hysteria2", "naiveproxy", "tuic" };
+        public static readonly List<string> coreTypes = new List<string> { "v2fly", "Xray", "v2fly_v5", "mihomo", "sing_box", "hysteria", "hysteria2", "naiveproxy", "tuic",
+            "juicity", "brook", "overtls", "shadowquic" };
         public static readonly List<string> domainMatchers = new List<string> { "linear", "mph", "" };
         public static readonly List<string> fingerprints = new List<string> { "chrome", "firefox", "safari", "randomized", "" };
         public static readonly List<string> domainStrategy4Freedoms = new List<string> { "AsIs", "UseIP", "UseIPv4", "UseIPv6", "" };

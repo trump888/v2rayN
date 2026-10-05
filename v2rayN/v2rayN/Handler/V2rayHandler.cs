@@ -209,7 +209,11 @@ namespace v2rayN.Handler
                     StartInfo = new ProcessStartInfo
                     {
                         FileName = fileName,
-                        Arguments = coreInfo.arguments,
+                        // 7.x substitutes {0} with the config path; 5.39 passed the
+                        // string verbatim, so a core whose arguments name a config
+                        // file (juicity, overtls, shadowquic, brook) could not be
+                        // started at all. Only affects cores that use {0}.
+                        Arguments = coreInfo.arguments?.Replace("{0}", Utils.GetPath(v2rayConfigRes)),
                         WorkingDirectory = Utils.StartupPath(),
                         UseShellExecute = false,
                         RedirectStandardOutput = coreInfo.redirectInfo,
