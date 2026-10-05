@@ -149,6 +149,25 @@ namespace v2rayN.Handler
             // so an old profile still routes to mihomo-equivalent behaviour rather
             // than failing to find a core at all.
 
+            // ECoreType.mihomo was in Global.coreTypes (so the UI offered it) but had
+            // no CoreInfo registered at all -- selecting it could not resolve a core.
+            // It replaced clash and clash_meta, so this is now the only Clash-family
+            // entry: the repo they were renamed to ships mihomo-windows-amd64.exe, and
+            // none of their old Clash.Meta-* exe names can match it.
+            coreInfos.Add(new CoreInfo
+            {
+                coreType = ECoreType.mihomo,
+                coreExes = new List<string> { "mihomo-windows-amd64", "mihomo-windows-386", "mihomo-amd64", "mihomo" },
+                arguments = "-f config.json",
+                coreUrl = Global.mihomoCoreUrl,
+                coreReleaseApiUrl = Global.mihomoCoreUrl.Replace(@"https://github.com", @"https://api.github.com/repos"),
+                coreDownloadUrl32 = Global.mihomoCoreUrl + "/download/{0}/mihomo-windows-386-{0}.zip",
+                coreDownloadUrl64 = Global.mihomoCoreUrl + "/download/{0}/mihomo-windows-amd64-{0}.zip",
+                match = "v",
+                versionArg = "-v",
+                redirectInfo = true,
+            });
+
             coreInfos.Add(new CoreInfo
             {
                 coreType = ECoreType.hysteria,
