@@ -311,7 +311,7 @@ jobs:
         $masque = Join-Path $gen 'masque.json'
         $skipMasque = $false
         if (Test-Path $masque) {
-          Write-Host "  skip   masque.json (not in any released sing-box; validated from source below)"
+          Write-Host "  skip   masque.json here (no released sing-box has it); checked separately below"
           $skipMasque = $true
         }
 
@@ -342,9 +342,10 @@ jobs:
         # binary-windows_amd64-legacy-windows-7 is deliberate: it is the Win7-capable
         # build, which is the point of this branch.
         if (-not (Test-Path $masque)) {
-          Write-Host "no masque.json produced; nothing to check"
+          Write-Host "no masque.json was produced by the checker; nothing to validate"
           return
         }
+        Write-Host "looking for a sing-box nightly with MASQUE"
         $headers = @{ 'User-Agent' = 'v2rayN-net48-check' }
         if ($env:GITHUB_TOKEN) { $headers['Authorization'] = "Bearer $env:GITHUB_TOKEN" }
 

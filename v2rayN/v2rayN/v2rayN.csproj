@@ -10,6 +10,28 @@
     </AssemblyAttribute>
   </ItemGroup>
   <PropertyGroup>
+    <!--
+      NU1902: log4net < 3.3.0 is flagged (GHSA-4f7c-pmjv-c25w, medium: silent log
+      event loss in XmlLayout / XmlLayoutSchemaLog4J from unescaped XML 1.0
+      forbidden characters).
+
+      Not applicable to this app, and deliberately suppressed rather than left as
+      unexplained noise: Tool/Logging.cs configures a PatternLayout
+      ("%date [%thread] %-5level %logger - %message%newline") and never
+      instantiates XmlLayout or XmlLayoutSchemaLog4J, which are the only affected
+      code paths.
+
+      This does NOT resolve the advisory. The whole 2.x line is affected and the
+      fix is 3.3.0+, which is a major version with breaking API changes
+      (reworked LoggingEvent and target setup) and needs runtime testing this
+      branch's CI cannot do. If log4net is ever moved to 3.x, delete this
+      suppression.
+    -->
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-4f7c-pmjv-c25w" />
+    <NuGetAudit>true</NuGetAudit>
+    <NuGetAuditLevel>moderate</NuGetAuditLevel>
+  </PropertyGroup>
+  <PropertyGroup>
     <TargetFramework>net48</TargetFramework>
     <LangVersion>preview</LangVersion>
     <OutputType>WinExe</OutputType>

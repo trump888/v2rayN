@@ -173,7 +173,7 @@ namespace v2rayN.Handler
         /// means the first half is the username, otherwise the whole thing is the
         /// password.
         /// </summary>
-        private static void SplitCredential(string raw, out string? user, out string? pass)
+        private static void SplitCredential(string raw, out string user, out string pass)
         {
             user = null;
             pass = null;
@@ -248,7 +248,7 @@ namespace v2rayN.Handler
             return outbound;
         }
 
-        private static JObject? GenTls(VmessItem item)
+        private static JObject GenTls(VmessItem item)
         {
             var sni = !string.IsNullOrEmpty(item.sni) ? item.sni : !string.IsNullOrEmpty(item.requestHost) ? item.requestHost : item.address;
             var host = sni.Split(',').First().Trim();
