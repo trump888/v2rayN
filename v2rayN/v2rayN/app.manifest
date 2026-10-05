@@ -3,20 +3,25 @@
   <assemblyIdentity version="1.0.0.0" name="v2rayN.app" />
 
   <!--
-    PerMonitorV2, so the window is sharp on a scaled display rather than bitmap
-    stretched by Windows. `true/pm` covers Windows 8.1+; the 2016-namespace
-    dpiAwareness refines it to PerMonitorV2 on Windows 10+. Windows 7 ignores
-    both, which is correct.
+    No DPI block here, on purpose.
 
-    Without this the process is DPI-unaware and the whole UI is blurry on any
-    display that is not at 100%.
+    Declaring PerMonitorV2 without the matching WinForms scaling switch makes the
+    process DPI-aware, so Windows stops bitmap-stretching the window, but .NET
+    Framework WinForms does not rescale anything itself. Every control then
+    renders at 1/1.5 or 1/2 physical size: sharp, and far too small. That is
+    worse than the DPI-unaware default this build shipped with for years, which
+    is blurry but correctly sized.
+
+    So it is left off entirely rather than half configured. Doing it properly
+    needs app.config's System.Windows.Forms.ApplicationConfigurationSection with
+    both DpiAwareness and EnableWindowsFormsHighDpiAutoResizing, and it has to be
+    checked on a real 150% and 200% display before shipping: a CI runner at
+    100% cannot see any of this.
+
+    The supportedOS block below is the part that matters, and it has no effect on
+    layout: without it Environment.OSVersion reports 6.2 on every machine, which
+    is what made GetCheckUpdateCoreTypes hide Xray, mihomo and sing-box.
   -->
-  <application xmlns="urn:schemas-microsoft-com:asm.v3">
-    <windowsSettings>
-      <dpiAware xmlns="http://schemas.microsoft.com/SMI/2005/WindowsSettings">true/pm</dpiAware>
-      <dpiAwareness xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">PerMonitorV2, PerMonitor</dpiAwareness>
-    </windowsSettings>
-  </application>
 
   <!--
     supportedOS. Without a declaration, .NET Framework's Environment.OSVersion

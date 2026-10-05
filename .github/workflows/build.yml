@@ -347,17 +347,22 @@ jobs:
           '35138b9a-5d96-4fbd-8e2d-a2440225f93a')) { # Windows 7
           if ($mf -notmatch $guid) { Write-Error "app.manifest is missing supportedOS $guid"; exit 1 }
         }
-        # PerMonitorV2 in the manifest without the matching app.config switch leaves
-        # WinForms unscaled: sharp, but drawn at 1/1.5 or 1/2 size on a scaled
-        # display. This is exactly the regression that shipped once, so the two are
-        # asserted to agree.
+        # The manifest must NOT declare PerMonitorV2 while app.config is absent:
+        # that combination makes the process DPI-aware without telling WinForms to
+        # scale, so the UI renders sharp and far too small on any scaled display.
+        # It shipped once and was reported from a real 200% machine. The correct
+        # fix needs both files plus EnableWindowsFormsHighDpiAutoResizing, and
+        # verification on real 150% / 200% hardware, which CI cannot do at 100%.
         $mfDpi = $mf -match 'PerMonitorV2'
         $appConfig = 'v2rayN/v2rayN/app.config'
         $cfgDpi = (Test-Path $appConfig) -and ((Get-Content $appConfig -Raw) -match 'DpiAwareness')
         Write-Host "  manifest PerMonitorV2: $mfDpi / app.config DpiAwareness: $cfgDpi"
-        if ($mfDpi -ne $cfgDpi) {
-          Write-Error "DPI awareness mismatch: app.manifest has PerMonitorV2=$mfDpi but app.config has DpiAwareness=$cfgDpi. They must agree or WinForms renders at the wrong size on a scaled display."
+        if ($mfDpi -and -not $cfgDpi) {
+          Write-Error "app.manifest declares PerMonitorV2 but there is no matching app.config DpiAwareness switch. WinForms will not rescale, so the UI renders at 1/1.5 or 1/2 size on a scaled display."
           exit 1
+        }
+        if ($mfDpi -or $cfgDpi) {
+          Write-Warning "PerMonitorV2 is active again. It cannot be validated on a 100% CI runner -- confirm the UI size on a real scaled display before trusting it."
         }
 
         # And confirm it reached the binary, not just the project file.
