@@ -143,6 +143,32 @@ share-link parser per core, plus the UI to expose it. It is not a merge; the 5.x
 UI has no equivalent of the newer profile editor. Treated as its own piece of
 work, not a drive-by.
 
+## This is a portable build: no auto-start, deliberately
+
+`AutoStartupHandler` is **not** ported, on purpose. Auto-start means writing to
+`HKCU\...\Run` or creating a scheduled task, and this is a 绿色版: it is unpacked
+into a folder and run from there, with no installer and nothing to uninstall.
+Adding it would trade the property the whole branch exists for -- runs from a
+folder, leaves the machine as it found it -- for a convenience feature the user
+can already get from Task Scheduler or a shortcut in `shell:startup`.
+
+Recorded here so nobody "finishes the port" by adding it later.
+
+### One caveat worth knowing about
+
+5.39 itself is not perfectly registry-clean. It writes two things to
+`HKCU\Software\v2rayNGUI` (`Global.MyRegPath`):
+
+- the main window handle, on handle creation
+- the chosen UI language
+
+That is pre-existing upstream behaviour and I did not change it: the language
+memory is a feature, and moving it into the config file would surprise anyone
+whose language is already remembered. It is an app key under HKCU, not a Run key,
+and nothing survives uninstalling because there is nothing to uninstall. But if
+"绿色版" for you means *literally* zero registry footprint, moving the two values
+into `guiConfigs` is a small, contained change -- say the word and I will do it.
+
 ## Dead cores: what was kept and why
 
 Policy: a core whose project is gone **and that has a successor** is replaced by

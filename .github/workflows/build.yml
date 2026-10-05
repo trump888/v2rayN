@@ -329,6 +329,22 @@ jobs:
     # redirects MetaCubeX/Clash.Meta to MetaCubeX/mihomo) while its
     # "Clash.Meta-*" exe names stopped matching "mihomo-windows-amd64.exe", so
     # the binary was never found. Both compile, both run, both fail on click.
+    # Nothing should sit loose in the repository root. These arrived because
+    # `git add -A` swept up local sing-box validation experiments (mq.json, mq2.json,
+    # probe.json) and nothing caught it for several commits.
+    - name: No stray files in the repository root
+      shell: pwsh
+      run: |
+        $allowed = @('LICENSE', 'README.md', '.gitignore', '.gitattributes', 'build.bat', 'v2rayN.sln', 'startup.bat')
+        $stray = Get-ChildItem -Path . -File -Force |
+                 Where-Object { $_.Name -notin $allowed -and $_.Name -notlike '.*' } |
+                 Select-Object -ExpandProperty Name
+        if ($stray) {
+          Write-Error "unexpected files in the repository root: $($stray -join ', ')"
+          exit 1
+        }
+        Write-Host "repository root is clean"
+
     - name: Verify offered cores are registered
       shell: pwsh
       run: |
