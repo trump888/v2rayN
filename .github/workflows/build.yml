@@ -656,12 +656,20 @@ jobs:
           $runCfg = Join-Path $env:RUNNER_TEMP ("run-" + $f.Name)
           $cfg | ConvertTo-Json -Depth 20 | Set-Content -Path $runCfg -Encoding utf8
 
-          $proc = Start-Process -FilePath $useExe -ArgumentList @('run', '-c', $runCfg) -PassThru -WindowStyle Hidden
+          # Capture sing-box's own output. Without this a failure is just "exited with
+          # code 1" and the reason is invisible -- which is exactly how the naive
+          # username problem was hard to pin down.
+          $runLog = Join-Path $env:RUNNER_TEMP ("run-" + $f.Name + ".log")
+          $proc = Start-Process -FilePath $useExe -ArgumentList @('run', '-c', $runCfg) -PassThru -WindowStyle Hidden `
+                  -RedirectStandardOutput $runLog -RedirectStandardError $runLog
           $ok = $false
           try {
             Start-Sleep -Seconds 3
             if ($proc.HasExited) {
-              Write-Error "$($f.Name): sing-box exited immediately with code $($proc.ExitCode)"
+              Write-Host "  FAILED  $($f.Name): sing-box exited with code $($proc.ExitCode)"
+              if (Test-Path $runLog) {
+                Get-Content $runLog -TotalCount 12 | ForEach-Object { Write-Host "      $_" }
+              }
             } else {
               $client = [System.Net.Sockets.TcpClient]::new()
               $task = $client.ConnectAsync('127.0.0.1', $port)

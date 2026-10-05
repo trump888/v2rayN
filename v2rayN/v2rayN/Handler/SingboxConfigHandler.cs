@@ -224,14 +224,13 @@ namespace v2rayN.Handler
                 if (item.configType == EConfigType.Naive)
                 {
                     SplitCredential(item.id, out var nu, out var np);
-                    if (nu != null)
-                    {
-                        outbound["username"] = nu;
-                    }
-                    if (np != null)
-                    {
-                        outbound["password"] = np;
-                    }
+                    // Always emit username, even empty. A naive outbound with a
+                    // password and no username at all passes `sing-box check` on
+                    // Linux but the Windows build exits 1 at startup -- and `check`
+                    // is not what runs the config. Emitting it unconditionally is
+                    // unambiguous on both.
+                    outbound["username"] = nu ?? string.Empty;
+                    outbound["password"] = np ?? string.Empty;
                 }
                 else
                 {
