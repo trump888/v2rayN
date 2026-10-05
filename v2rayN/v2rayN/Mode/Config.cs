@@ -752,6 +752,28 @@ namespace v2rayN.Mode
             set;
         }
         #endregion Reality
+
+        #region xhttp
+        /// <summary>
+        /// xhttp mode: auto, packet-up, stream-up or stream-one. Reuses
+        /// headerType, the same slot 7.x uses, so no new concept is introduced.
+        /// </summary>
+        public string xhttpMode
+        {
+            get;
+            set;
+        }
+        /// <summary>
+        /// Raw JSON passed through to Xray as xhttpSettings.extra. This is the
+        /// escape hatch the xhttp spec is built around -- mode, scMaxEachStream,
+        /// noGRPCHeader and the rest -- so a full-fidelity implementation needs it.
+        /// </summary>
+        public string xhttpExtra
+        {
+            get;
+            set;
+        }
+        #endregion xhttp
 }
 
     [Serializable]

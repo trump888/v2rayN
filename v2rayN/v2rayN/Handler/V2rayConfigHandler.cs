@@ -900,6 +900,49 @@ namespace v2rayN.Handler
                         //streamSettings.tlsSettings = tlsSettings2;
                         break;
                     //quic
+                    // httpupgrade. Absent in 5.39. Same shape as ws -- host and path --
+                    // with Xray's httpupgrade semantics.
+                    case "httpupgrade":
+                        HttpupgradeSettings httpupgradeSettings = new HttpupgradeSettings
+                        {
+                            host = host,
+                            path = node.path
+                        };
+                        streamSettings.httpupgradeSettings = httpupgradeSettings;
+                        break;
+
+                    // xhttp. Absent in 5.39, and it is the transport current
+                    // VLESS/Reality deployments actually use, so its absence is not
+                    // cosmetic. mode is validated against Global.XhttpMode rather than
+                    // passed through blindly, and extra is the raw-JSON escape hatch
+                    // the xhttp spec is designed around.
+                    case "xhttp":
+                        XhttpSettings xhttpSettings = new XhttpSettings
+                        {
+                            path = node.path,
+                            host = host,
+                        };
+                        if (!string.IsNullOrWhiteSpace(node.xhttpMode)
+                            && Global.XhttpMode.Contains(node.xhttpMode))
+                        {
+                            xhttpSettings.mode = node.xhttpMode;
+                        }
+                        if (!string.IsNullOrWhiteSpace(node.xhttpExtra))
+                        {
+                            try
+                            {
+                                xhttpSettings.extra = Newtonsoft.Json.Linq.JToken.Parse(node.xhttpExtra);
+                            }
+                            catch (Exception ex)
+                            {
+                                // Bad JSON in a user-supplied extra must not take the
+                                // whole config generation down with it.
+                                Utils.SaveLog("boundStreamSettings-xhttpExtra", ex);
+                            }
+                        }
+                        streamSettings.xhttpSettings = xhttpSettings;
+                        break;
+
                     case "quic":
                         QuicSettings quicsettings = new QuicSettings
                         {

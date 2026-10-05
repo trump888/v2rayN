@@ -409,6 +409,16 @@ namespace v2rayN.Mode
         /// Tcp传输额外设置
         /// </summary>
         public TcpSettings tcpSettings { get; set; }
+
+        /// <summary>
+        /// httpupgrade 设置。5.39 完全没有这个传输。
+        /// </summary>
+        public HttpupgradeSettings httpupgradeSettings { get; set; }
+
+        /// <summary>
+        /// xhttp 设置。5.39 完全没有这个传输，而它正是当前 VLESS/Reality 部署所用的。
+        /// </summary>
+        public XhttpSettings xhttpSettings { get; set; }
         /// <summary>
         /// Kcp传输额外设置
         /// </summary>
@@ -436,6 +446,37 @@ namespace v2rayN.Mode
         /// </summary>
         public GrpcSettings grpcSettings { get; set; }
 
+    }
+
+    /// <summary>
+    /// httpupgrade 设置，对应 Xray 的 httpupgradeSettings。
+    /// </summary>
+    public class HttpupgradeSettings
+    {
+        public string host { get; set; }
+        public string path { get; set; }
+        public HttpupgradeHeaders headers { get; set; }
+    }
+
+    public class HttpupgradeHeaders
+    {
+        public string UserAgent { get; set; }
+    }
+
+    /// <summary>
+    /// xhttp 设置，对应 Xray 的 xhttpSettings。
+    /// </summary>
+    public class XhttpSettings
+    {
+        public string path { get; set; }
+        public string host { get; set; }
+        public string mode { get; set; }
+        /// <summary>
+        /// Raw JSON passthrough. Typed object so this file does not need
+        /// Newtonsoft's Linq namespace; a JToken assigned here still serialises
+        /// correctly.
+        /// </summary>
+        public object extra { get; set; }
     }
 
     /// <summary>

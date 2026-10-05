@@ -540,6 +540,36 @@ namespace v2rayN.Handler
                     }
                     break;
 
+                case "httpupgrade":
+                    if (!Utils.IsNullOrEmpty(item.requestHost))
+                    {
+                        dicQuery.Add("host", Utils.UrlEncode(item.requestHost));
+                    }
+                    if (!Utils.IsNullOrEmpty(item.path))
+                    {
+                        dicQuery.Add("path", Utils.UrlEncode(item.path));
+                    }
+                    break;
+
+                case "xhttp":
+                    if (!Utils.IsNullOrEmpty(item.requestHost))
+                    {
+                        dicQuery.Add("host", Utils.UrlEncode(item.requestHost));
+                    }
+                    if (!Utils.IsNullOrEmpty(item.path))
+                    {
+                        dicQuery.Add("path", Utils.UrlEncode(item.path));
+                    }
+                    if (!Utils.IsNullOrEmpty(item.xhttpMode))
+                    {
+                        dicQuery.Add("mode", item.xhttpMode);
+                    }
+                    if (!Utils.IsNullOrEmpty(item.xhttpExtra))
+                    {
+                        dicQuery.Add("extra", Utils.UrlEncode(item.xhttpExtra));
+                    }
+                    break;
+
                 case "http":
                 case "h2":
                     dicQuery["type"] = "http";
@@ -1482,6 +1512,26 @@ namespace v2rayN.Handler
                 case "ws":
                     item.requestHost = Utils.UrlDecode(query["host"] ?? "");
                     item.path = Utils.UrlDecode(query["path"] ?? "/");
+                    break;
+
+                // httpupgrade takes the same parameters as ws.
+                case "httpupgrade":
+                    item.requestHost = Utils.UrlDecode(query["host"] ?? "");
+                    item.path = Utils.UrlDecode(query["path"] ?? "/");
+                    break;
+
+                // xhttp: host/path plus a mode and a raw-JSON extra, matching 7.x.
+                case "xhttp":
+                    item.requestHost = Utils.UrlDecode(query["host"] ?? "");
+                    item.path = Utils.UrlDecode(query["path"] ?? "/");
+                    item.xhttpMode = query["mode"] ?? "";
+                    item.xhttpExtra = Utils.UrlDecode(query["extra"] ?? "");
+                    break;
+
+                // Xray renamed tcp to raw; current links say raw, not tcp.
+                case "raw":
+                    item.headerType = query["headerType"] ?? "none";
+                    item.requestHost = Utils.UrlDecode(query["host"] ?? "");
                     break;
 
                 case "http":

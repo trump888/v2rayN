@@ -68,6 +68,10 @@ namespace SingboxConfigCheck
             NaiveRoundTrip(outDir);
 
             Console.WriteLine();
+            Console.WriteLine("== transports ==");
+            Transports();
+
+            Console.WriteLine();
             Console.WriteLine("== reality ==");
             Reality();
 
@@ -196,6 +200,82 @@ namespace SingboxConfigCheck
             Check(rc2 == 0, "GenerateClientConfig still succeeds for VMess");
             Check(v2rayContent.Contains("\"outbounds\"") && !v2rayContent.Contains("\"anytls\""),
                   "VMess still generates v2ray JSON");
+        }
+
+        /// <summary>
+        /// Transports. 5.39 knew tcp / kcp / ws / h2 / quic / grpc; httpupgrade and
+        /// xhttp were absent, and xhttp is what current VLESS/Reality deployments
+        /// use, so a link carrying type=xhttp silently fell back to the default
+        /// transport and produced a config the server would not accept.
+        /// </summary>
+        private static void Transports()
+        {
+            foreach (var (type, expectPath) in new[]
+            {
+                ("xhttp", "/xhttp"),
+                ("httpupgrade", "/hu"),
+            })
+            {
+                var link = "vless://uuid@t.example.com:443?encryption=none&security=tls&sni=s.example" +
+                    $"&type={type}&host=h.example&path={expectPath}" +
+                    (type == "xhttp" ? "&mode=packet-up&extra=%7B%22scMaxEachStream%22%3A4%7D" : "") +
+                    "#T-" + type;
+
+                var item = ShareHandler.ImportFromClipboardConfig(link, out var msg);
+                Check(item != null, $"{type}: link imports (msg: {msg})");
+                if (item == null) { continue; }
+                Check(item.network == type, $"{type}: network is {type} (got '{item.network}')");
+                Check(item.requestHost == "h.example", $"{type}: host (got '{item.requestHost}')");
+                Check(item.path == expectPath, $"{type}: path (got '{item.path}')");
+                if (type == "xhttp")
+                {
+                    Check(item.xhttpMode == "packet-up", $"xhttp: mode (got '{item.xhttpMode}')");
+                    Check(item.xhttpExtra.Contains("scMaxEachStream"), $"xhttp: extra json (got '{item.xhttpExtra}')");
+                }
+
+                var again = ShareHandler.ImportFromClipboardConfig(ShareHandler.GetShareUrl(item), out _);
+                Check(again != null && again.network == type && again.requestHost == item.requestHost
+                      && again.path == item.path && again.xhttpMode == item.xhttpMode
+                      && again.xhttpExtra == item.xhttpExtra,
+                      $"{type}: survives an export/import cycle unchanged");
+
+                var cfg = new Config
+                {
+                    inbound = new List<InItem>
+                    {
+                        new InItem { protocol = Global.InboundSocks, localPort = 10808, udpEnabled = true, sniffingEnabled = true },
+                    },
+                };
+                LazyConfig.Instance.SetConfig(ref cfg);
+                var file = Path.Combine(Path.GetTempPath(), "t-" + type + ".json");
+                var rc = V2rayConfigHandler.GenerateClientConfig(item, file, out var genMsg, out _);
+                Check(rc == 0, $"{type}: config generates (msg: {genMsg})");
+                if (rc != 0 || !File.Exists(file)) { continue; }
+
+                var json = File.ReadAllText(file);
+                Check(json.Contains($"\"network\": \"{type}\""), $"{type}: streamSettings.network emitted");
+                if (type == "xhttp")
+                {
+                    Check(json.Contains("xhttpSettings"), "xhttp: xhttpSettings present");
+                    Check(json.Contains("\"mode\": \"packet-up\""), "xhttp: mode emitted");
+                    Check(json.Contains("scMaxEachStream"), "xhttp: extra passthrough present");
+                }
+                else
+                {
+                    Check(json.Contains("httpupgradeSettings"), "httpupgrade: httpupgradeSettings present");
+                    Check(json.Contains("\"host\": \"h.example\""), "httpupgrade: host emitted");
+                }
+                File.Delete(file);
+            }
+
+            // Xray renamed tcp to raw; both must parse.
+            var raw = ShareHandler.ImportFromClipboardConfig(
+                "vless://uuid@r.example.com:443?encryption=none&security=tls&type=raw&headerType=none#RAW", out _);
+            Check(raw != null && raw.network == "raw", $"type=raw parses (got '{raw?.network}')");
+            Check(Global.networks.Contains("xhttp") && Global.networks.Contains("httpupgrade")
+                  && Global.networks.Contains("raw"),
+                  "all three added to Global.networks so the UI dropdown offers them");
+            Check(Global.XhttpMode.Count == 4, "Global.XhttpMode carries 7.x's four modes");
         }
 
         /// <summary>
