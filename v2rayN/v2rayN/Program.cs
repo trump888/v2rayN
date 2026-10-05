@@ -12,8 +12,18 @@ namespace v2rayN
         /// 应用程序的主入口点。
         /// </summary>
         [STAThread]
-        static void Main()
+        static void Main(string[] args)
         {
+            // --selftest runs the port's own checks here, on the real desktop, before
+            // any UI or registry state. CI runs the same logic headless, which cannot
+            // tell the user whether the UI comes up or the DPI is right on their
+            // machine; this does. See SelfTest.cs.
+            if (args != null && args.Length > 0 && args[0] == "--selftest")
+            {
+                Environment.Exit(SelfTest.Run());
+                return;
+            }
+
             if (Environment.OSVersion.Version.Major >= 6)
             {
                 Utils.SetProcessDPIAware();

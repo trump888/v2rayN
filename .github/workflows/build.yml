@@ -329,6 +329,21 @@ jobs:
     # redirects MetaCubeX/Clash.Meta to MetaCubeX/mihomo) while its
     # "Clash.Meta-*" exe names stopped matching "mihomo-windows-amd64.exe", so
     # the binary was never found. Both compile, both run, both fail on click.
+    # Run the shipped app's own --selftest. This is the same entry point a user runs
+    # on their machine, so it is the one piece of verification that is not a
+    # reimplementation of it in a test project.
+    - name: Run v2rayN.exe --selftest
+      shell: pwsh
+      run: |
+        $exe = Get-ChildItem 'v2rayN/v2rayN/bin/Release' -Recurse -Filter 'v2rayN.exe' -File |
+               Select-Object -First 1
+        if (-not $exe) { throw "v2rayN.exe not built" }
+        $out = & $exe.FullName --selftest 2>&1
+        $code = $LASTEXITCODE
+        $out | ForEach-Object { Write-Host $_ }
+        if ($code -ne 0) { throw "--selftest failed with exit code $code" }
+        Remove-Item (Join-Path $exe.DirectoryName 'selftest') -Recurse -Force -ErrorAction SilentlyContinue
+
     # Nothing should sit loose in the repository root. These arrived because
     # `git add -A` swept up local sing-box validation experiments (mq.json, mq2.json,
     # probe.json) and nothing caught it for several commits.
