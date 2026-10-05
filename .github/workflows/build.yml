@@ -488,6 +488,15 @@ jobs:
         if ($bad -gt 0) { throw "$bad of $count generated sing-box configurations were rejected" }
         Write-Host "all $count generated sing-box configurations accepted by sing-box $ver"
 
+        # Hand the binary to the next step rather than making it resolve one itself:
+        # this step's copy is known to exist, and a dependency on RUNNER_TEMP contents
+        # that another step may or may not have created is how the runtime step died
+        # silently when the nightly branch below returned early.
+        $handoff = 'artifacts/singbox'
+        New-Item -ItemType Directory -Force -Path $handoff | Out-Null
+        Copy-Item $sb.FullName (Join-Path $handoff 'sing-box.exe') -Force
+        Write-Host "handed sing-box.exe to $handoff"
+
         # --- Validate MASQUE against a prebuilt sing-box that has it -----------
         # MASQUE is in sing-box master (e22cd5406, 2026-09-21) and is still ahead of
         # v1.14.2, so the release every user installs rejects it. It does ship in the
@@ -559,6 +568,8 @@ jobs:
             exit 1
           }
           Write-Host "  valid   $($mf.Name) (accepted by a prebuilt sing-box nightly)"
+          Copy-Item $sbExe.FullName (Join-Path $handoff 'sing-box-nightly.exe') -Force
+          Write-Host "  ran     $($mf.Name) (see the runtime step)"
         }
 
     # `sing-box check` proves the loader accepts the file. This proves the *runtime*
@@ -613,19 +624,29 @@ jobs:
         # --- 2. run each generated config and connect to it --------------------
         # MASQUE needs a sing-box that has it, which no release does; it is covered
         # by the nightly check in the previous step.
-        $sb = Get-ChildItem 'artifacts/singbox-check' -Filter '*.json' -File |
-              Where-Object { $_.Name -notmatch 'masque' }
+        $sb = @(Get-ChildItem 'artifacts/singbox-check' -Filter '*.json' -File |
+                Where-Object { $_.Name -notmatch 'masque' })
         if ($sb.Count -eq 0) { throw "no generated configurations found" }
 
-        $exe = Get-ChildItem (Join-Path $env:RUNNER_TEMP 'sb-nightly-bin') -Recurse -Filter 'sing-box.exe' -File -ErrorAction SilentlyContinue |
-               Select-Object -First 1
-        if (-not $exe) { throw "sing-box.exe not found; the previous step must run first" }
+        $exe = 'artifacts/singbox/sing-box.exe'
+        if (-not (Test-Path $exe)) { throw "$exe not found; the previous step must run first" }
+
+        # MASQUE needs the nightly, which the previous step hands over when it ran.
+        $nightly = 'artifacts/singbox/sing-box-nightly.exe'
+        $sbAll = @($sb)
+        if (Test-Path $nightly) {
+          $sbAll += @(Get-ChildItem $gen -Filter '*.json' -File | Where-Object { $_.Name -match 'masque' })
+          Write-Host "nightly present, so the MASQUE configurations are run too"
+        } else {
+          Write-Warning "no nightly sing-box handed over; skipping the MASQUE run (its config is still checked in the previous step)"
+        }
 
         $runFailures = 0
-        foreach ($f in $sb) {
+        foreach ($f in $sbAll) {
+          $useExe = if ($f.Name -match 'masque') { $nightly } else { $exe }
           $cfg = Get-Content $f.FullName -Raw | ConvertFrom-Json
           $port = [int]$cfg.inbounds[0].listen_port
-          $proc = Start-Process -FilePath $exe.FullName -ArgumentList @('run', '-c', $f.FullName) -PassThru -WindowStyle Hidden
+          $proc = Start-Process -FilePath $useExe -ArgumentList @('run', '-c', $f.FullName) -PassThru -WindowStyle Hidden
           $ok = $false
           try {
             Start-Sleep -Seconds 3
@@ -646,7 +667,7 @@ jobs:
           if (-not $ok) { $runFailures++ }
         }
         if ($runFailures -gt 0) { throw "$runFailures configurations did not run" }
-        Write-Host "all $($sb.Count) configurations ran and bound their inbound"
+        Write-Host "all $($sbAll.Count) configurations ran and bound their inbound"
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
