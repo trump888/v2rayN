@@ -212,6 +212,46 @@ jobs:
           Write-Warning "$bad of $($repos.Count) core repositories are gone, archived or stale. Updating them is a product decision, not a build fix -- see the branch README."
         }
 
+        # Policy, enforced rather than remembered:
+        #   - a core whose project is gone but that HAS a successor must not be
+        #     offered; the successor is offered instead
+        #   - a core whose project is gone and has NO successor is kept and offered
+        #
+        # Without this, "which dead cores do we keep" is a decision someone has to
+        # remember, and the next person either adds a 404 back or drops something
+        # with no replacement.
+        $retained = @{ 'zzzgydi/mieru' = 'no successor exists; mieru is a protocol this build speaks' }
+        $superseded = @{
+          'Dreamacro/clash'       = 'MetaCubeX/mihomo'
+          'MetaCubeX/Clash.Meta'  = 'MetaCubeX/mihomo'
+          'SagerNet/v2ray-core'   = 'v2fly/v2ray-core'
+        }
+
+        $offeredText = Get-Content v2rayN/v2rayN/Global.cs -Raw
+        $offeredBlock = [regex]::Match($offeredText, 'coreTypes\s*=\s*new List<string>\s*\{(?<b>[^}]*)\}').Groups['b'].Value
+        $offered = [regex]::Matches($offeredBlock, '"([^"]+)"') | ForEach-Object { $_.Groups[1].Value }
+
+        $urlText = Get-Content v2rayN/v2rayN/Global.cs -Raw
+        foreach ($r in $superseded.Keys) {
+          $slug = $r.Split('/')[1]
+          $constants = [regex]::Matches($urlText, 'public const string \w*CoreUrl\s*=\s*"https://github\.com/' + [regex]::Escape($r))
+          $inUrls = $constants.Count -gt 0
+          $inOffered = $offered -contains $slug
+          if ($inUrls -or $inOffered) {
+            Write-Error "$r has a successor ($($superseded[$r])) and must not be offered or have a CoreUrl here (offered: $inOffered, CoreUrl: $inUrls)"
+            exit 1
+          }
+          Write-Host ("  ok       {0,-30} superseded by {1}, not offered" -f $r, $superseded[$r])
+        }
+        foreach ($r in $retained.Keys) {
+          $slug = $r.Split('/')[1]
+          if ($offered -notcontains $slug) {
+            Write-Error "$r has no successor and must stay offered; it is not in Global.coreTypes. Reason it is kept: $($retained[$r])"
+            exit 1
+          }
+          Write-Host ("  ok       {0,-30} kept ($($retained[$r]))" -f $r)
+        }
+
         # A live repository says nothing about whether the asset name in a CoreInfo
         # still matches what the release publishes. clash_meta was exactly that:
         # MetaCubeX/Clash.Meta redirects to MetaCubeX/mihomo, downloads succeeded, and

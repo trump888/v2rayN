@@ -209,11 +209,7 @@ namespace v2rayN.Handler
                     StartInfo = new ProcessStartInfo
                     {
                         FileName = fileName,
-                        // 7.x substitutes {0} with the config path; 5.39 passed the
-                        // string verbatim, so a core whose arguments name a config
-                        // file (juicity, overtls, shadowquic, brook) could not be
-                        // started at all. Only affects cores that use {0}.
-                        Arguments = coreInfo.arguments?.Replace("{0}", Utils.GetPath(v2rayConfigRes)),
+                        Arguments = ResolveArguments(coreInfo.arguments),
                         WorkingDirectory = Utils.StartupPath(),
                         UseShellExecute = false,
                         RedirectStandardOutput = coreInfo.redirectInfo,
@@ -258,6 +254,27 @@ namespace v2rayN.Handler
         /// <summary>
         /// V2ray启动，新建进程，传入配置字符串
         /// </summary>
+        /// <summary>
+        /// Expand CoreInfo.arguments.
+        ///
+        /// 7.x substitutes {0} with the config path; 5.39 handed the string to
+        /// ProcessStartInfo verbatim, so any core whose arguments name a config file
+        /// -- juicity ("run -c {0}"), overtls ("-r client -c {0}"), shadowquic
+        /// ("-c {0}"), brook ("{0}") -- could not have been started at all. Cores
+        /// whose arguments contain no {0} are unaffected.
+        ///
+        /// Public and static so it can be asserted directly rather than inferred
+        /// from a spawned process.
+        /// </summary>
+        public static string ResolveArguments(string? arguments)
+        {
+            if (string.IsNullOrEmpty(arguments) || !arguments.Contains("{0}"))
+            {
+                return arguments ?? string.Empty;
+            }
+            return arguments.Replace("{0}", Utils.GetPath(v2rayConfigRes));
+        }
+
         private int V2rayStartNew(string configStr)
         {
             ShowMsg(false, string.Format(ResUI.StartService, DateTime.Now.ToString()));

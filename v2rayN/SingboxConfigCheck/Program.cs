@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using v2rayN;
+using v2rayN.Base;
 using v2rayN.Handler;
 using v2rayN.Mode;
 
@@ -68,6 +69,10 @@ namespace SingboxConfigCheck
             Console.WriteLine();
             Console.WriteLine("== core table ==");
             CoreTable();
+
+            Console.WriteLine();
+            Console.WriteLine("== core policy and arguments ==");
+            CorePolicy();
 
             Console.WriteLine();
             Console.WriteLine("== add-server form ==");
@@ -341,6 +346,84 @@ namespace SingboxConfigCheck
                 }
                 Check(json.Contains($"\"password\": \"{expectedPass.Replace("@", "@")}\""), $"naive ({label}) sets password '{expectedPass}'");
             }
+        }
+
+        /// <summary>
+        /// The core table as a whole: every offered core resolves, none of them is
+        /// superseded, the enum values that saved profiles depend on have not moved,
+        /// and the {0} argument substitution works.
+        /// </summary>
+        private static void CorePolicy()
+        {
+            var lazy = LazyConfig.Instance;
+
+            foreach (var name in Global.coreTypes)
+            {
+                var ok = Enum.TryParse<ECoreType>(name, out var ct) && lazy.GetCoreInfo(ct) != null;
+                Check(ok, $"offered core '{name}' has a CoreInfo registration");
+            }
+
+            // Policy: a gone project with a successor must not be offered. These are
+            // the ones with successors; mieru is deliberately absent because it has
+            // none and is kept.
+            foreach (var gone in new[] { "clash", "clash_meta", "SagerNet" })
+            {
+                Check(!Global.coreTypes.Contains(gone),
+                      $"'{gone}' has a successor (mihomo / v2fly) and is not offered");
+            }
+            Check(Global.coreTypes.Contains("mieru"),
+                  "mieru has no successor, so it stays offered");
+            Check(lazy.GetCoreInfo(ECoreType.mieru) != null, "mieru still has a CoreInfo registration");
+
+            // The four cores ported from 7.x, with the exact asset names verified
+            // against each repository's latest release.
+            var expected = new Dictionary<ECoreType, (string Exe, string Asset)>
+            {
+                [ECoreType.juicity]     = ("juicity-client", "juicity-windows-x86_64.zip"),
+                [ECoreType.brook]       = ("brook_windows_amd64", "brook_windows_amd64.exe"),
+                [ECoreType.overtls]     = ("overtls-bin", "overtls-x86_64-win7-windows-msvc.zip"),
+                [ECoreType.shadowquic]  = ("shadowquic", "shadowquic-x86_64-windows.exe"),
+            };
+            foreach (var (ct, (exe, asset)) in expected)
+            {
+                var info = lazy.GetCoreInfo(ct);
+                Check(info != null, $"{ct} is registered");
+                if (info == null) { continue; }
+                Check(info.coreExes != null && info.coreExes.Contains(exe), $"{ct} exe name is '{exe}'");
+                Check(info.coreDownloadUrl64 != null && info.coreDownloadUrl64.Contains(asset),
+                      $"{ct} downloads '{asset}'");
+                Check(!string.IsNullOrEmpty(info.coreReleaseApiUrl), $"{ct} has a release API url");
+            }
+            // overtls: the -win7- variant specifically, since this branch targets Win7.
+            var otls = lazy.GetCoreInfo(ECoreType.overtls);
+            Check(otls != null && otls.coreDownloadUrl64.Contains("-win7-"),
+                  "overtls uses the Win7 build, not -pc-");
+
+            // Enum values are persisted in saved profiles and must not move.
+            foreach (var (ct, v) in new[]
+            {
+                (ECoreType.Mieru, 30), (ECoreType.juicity, 25), (ECoreType.brook, 27),
+                (ECoreType.overtls, 28), (ECoreType.shadowquic, 29),
+                (ECoreType.sing_box, 24), (ECoreType.hysteria2, 26),
+                (ECoreType.naiveproxy, 22), (ECoreType.tuic, 23), (ECoreType.hysteria, 21),
+                (ECoreType.clash_meta, 12), (ECoreType.Xray, 2), (ECoreType.v2fly, 1),
+                (ECoreType.v2fly_v5, 3), (ECoreType.v2rayN, 99),
+            })
+            {
+                Check((int)ct == v, $"{ct} is still {v}");
+            }
+
+            // The {0} substitution. Without it, juicity / overtls / shadowquic /
+            // brook cannot be started at all.
+            var cfgPath = Utils.GetPath("config.json");
+            Check(v2rayN.Handler.V2rayHandler.ResolveArguments("run -c {0}") == "run -c " + cfgPath,
+                  "juicity-style argument expands {0}");
+            Check(v2rayN.Handler.V2rayHandler.ResolveArguments("{0}") == cfgPath,
+                  "brook-style bare {0} expands to just the config path");
+            Check(v2rayN.Handler.V2rayHandler.ResolveArguments("-f config.json") == "-f config.json",
+                  "an argument with no {0} is left alone (clash_meta)");
+            Check(v2rayN.Handler.V2rayHandler.ResolveArguments("") == "", "empty argument stays empty");
+            Check(v2rayN.Handler.V2rayHandler.ResolveArguments(null) == "", "null argument becomes empty");
         }
 
         /// <summary>

@@ -133,51 +133,21 @@ namespace v2rayN.Handler
                 redirectInfo = true,
             });
 
-            coreInfos.Add(new CoreInfo
-            {
-                coreType = ECoreType.clash,
-                coreExes = new List<string> { "clash-windows-amd64-v3", "clash-windows-amd64", "clash-windows-386", "clash" },
-                arguments = "-f config.json",
-                coreUrl = Global.clashCoreUrl,
-                coreReleaseApiUrl = Global.clashCoreUrl.Replace(@"https://github.com", @"https://api.github.com/repos"),
-                coreDownloadUrl32 = Global.clashCoreUrl + "/download/{0}/clash-windows-386-{0}.zip",
-                coreDownloadUrl64 = Global.clashCoreUrl + "/download/{0}/clash-windows-amd64-{0}.zip",
-                match = "v",
-                versionArg = "-v",
-                redirectInfo = true,
-            });
-
-            // ECoreType.mihomo was in Global.coreTypes (so the UI offered it) but
-            // had no CoreInfo registered at all -- selecting it could not resolve
-            // a core. Registered here against the project's current name, with
-            // the current asset and exe names.
-            coreInfos.Add(new CoreInfo
-            {
-                coreType = ECoreType.mihomo,
-                coreExes = new List<string> { "mihomo-windows-amd64", "mihomo-windows-386", "mihomo-amd64", "mihomo" },
-                arguments = "-f config.json",
-                coreUrl = Global.mihomoCoreUrl,
-                coreReleaseApiUrl = Global.mihomoCoreUrl.Replace(@"https://github.com", @"https://api.github.com/repos"),
-                coreDownloadUrl32 = Global.mihomoCoreUrl + "/download/{0}/mihomo-windows-386-{0}.zip",
-                coreDownloadUrl64 = Global.mihomoCoreUrl + "/download/{0}/mihomo-windows-amd64-{0}.zip",
-                match = "v",
-                versionArg = "-v",
-                redirectInfo = true,
-            });
-
-            coreInfos.Add(new CoreInfo
-            {
-                coreType = ECoreType.clash_meta,
-                coreExes = new List<string> { "Clash.Meta-windows-amd64-compatible", "Clash.Meta-windows-amd64", "Clash.Meta-windows-386", "Clash.Meta", "clash" },
-                arguments = "-f config.json",
-                coreUrl = Global.clashMetaCoreUrl,
-                coreReleaseApiUrl = Global.clashMetaCoreUrl.Replace(@"https://github.com", @"https://api.github.com/repos"),
-                coreDownloadUrl32 = Global.clashMetaCoreUrl + "/download/{0}/Clash.Meta-windows-386-{0}.zip",
-                coreDownloadUrl64 = Global.clashMetaCoreUrl + "/download/{0}/Clash.Meta-windows-amd64-compatible-{0}.zip",
-                match = "v",
-                versionArg = "-v",
-                redirectInfo = true,
-            });
+            // clash and clash_meta are no longer registered.
+            //
+            // clash: Dreamacro/clash is 404, deleted outright. Successor is mihomo,
+            // which is registered and offered.
+            //
+            // clash_meta: MetaCubeX/Clash.Meta still redirects to MetaCubeX/mihomo so
+            // downloads succeed, but the release no longer contains any
+            // Clash.Meta-* executable -- it ships mihomo-windows-amd64.exe -- so no
+            // CoreInfo exe name can match. Successor is mihomo, again registered and
+            // offered.
+            //
+            // Both enum values are kept: they are persisted in saved profiles, and
+            // GetCoreType resolves an explicit coreType before consulting the table,
+            // so an old profile still routes to mihomo-equivalent behaviour rather
+            // than failing to find a core at all.
 
             coreInfos.Add(new CoreInfo
             {

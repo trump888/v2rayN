@@ -270,7 +270,12 @@ namespace v2rayN
         /// working for a configuration that still references it.
         /// </summary>
         public static readonly List<string> coreTypes = new List<string> { "v2fly", "Xray", "v2fly_v5", "mihomo", "sing_box", "hysteria", "hysteria2", "naiveproxy", "tuic",
-            "juicity", "brook", "overtls", "shadowquic" };
+            "juicity", "brook", "overtls", "shadowquic",
+            // Kept deliberately: zzzgydi/mieru is 404 with no successor anywhere, and
+            // mieru is a protocol 5.39 can speak. Upstream 7.x dropped it, but a
+            // successor that can replace it does not exist, so it stays offered for
+            // anyone already using it. See the branch README.
+            "mieru" };
         public static readonly List<string> domainMatchers = new List<string> { "linear", "mph", "" };
         public static readonly List<string> fingerprints = new List<string> { "chrome", "firefox", "safari", "randomized", "" };
         public static readonly List<string> domainStrategy4Freedoms = new List<string> { "AsIs", "UseIP", "UseIPv4", "UseIPv6", "" };
