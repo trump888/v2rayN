@@ -722,6 +722,41 @@ namespace v2rayN.Handler
         /// <param name="config"></param>
         /// <param name="vmessItem"></param>
         /// <returns></returns>
+        /// <summary>
+        /// Store a server whose protocol has no dedicated Add&lt;Proto&gt;Server.
+        ///
+        /// AddServer cannot be reused for these: its first statement is
+        /// `vmessItem.configType = EConfigType.VMess`, so it overwrites the type,
+        /// and it then rejects anything whose `security` is empty because
+        /// Global.vmessSecuritys has no empty entry. The protocols that store a
+        /// plain password -- Hysteria2, Mieru, TUIC, and now AnyTLS and Naive --
+        /// leave `security` empty, so they were either stamped as VMess or
+        /// rejected outright. AddVlessServer shows the correct shape: stamp the
+        /// real type, trim, then AddServerCommon, with no VMess-specific
+        /// validation.
+        /// </summary>
+        public static int AddTypedServer(ref Config config, VmessItem vmessItem, EConfigType configType, bool toFile = true)
+        {
+            vmessItem.configType = configType;
+
+            vmessItem.address = vmessItem.address.TrimEx();
+            vmessItem.id = vmessItem.id.TrimEx();
+            vmessItem.security = vmessItem.security.TrimEx();
+            vmessItem.network = vmessItem.network.TrimEx();
+            vmessItem.headerType = vmessItem.headerType.TrimEx();
+            vmessItem.requestHost = vmessItem.requestHost.TrimEx();
+            vmessItem.path = vmessItem.path.TrimEx();
+            vmessItem.streamSecurity = vmessItem.streamSecurity.TrimEx();
+
+            AddServerCommon(ref config, vmessItem);
+
+            if (toFile)
+            {
+                ToJsonFile(config);
+            }
+            return 0;
+        }
+
         public static int AddVlessServer(ref Config config, VmessItem vmessItem, bool toFile = true)
         {
             vmessItem.configType = EConfigType.VLESS;
@@ -943,38 +978,19 @@ namespace v2rayN.Handler
                         countServers++;
                     }
                 }
-                else if (vmessItem.configType == EConfigType.Hysteria2)
-                {
-                    if (AddServer(ref config, vmessItem, false) == 0)
-                    {
-                        countServers++;
-                    }
-                }
-                else if (vmessItem.configType == EConfigType.Mieru)
-                {
-                    if (AddServer(ref config, vmessItem, false) == 0)
-                    {
-                        countServers++;
-                    }
-                }
-                else if (vmessItem.configType == EConfigType.TUIC)
-                {
-                    if (AddServer(ref config, vmessItem, false) == 0)
-                    {
-                        countServers++;
-                    }
-                }
-                else if (vmessItem.configType == EConfigType.AnyTLS
+                // One branch for every protocol that stores a plain password.
+                // These used to call AddServer, which stamps configType = VMess and
+                // then rejects an empty `security` -- so they were stamped as VMess
+                // or dropped, whichever came first. AddServer has no `else` below
+                // either, so an unlisted type parsed and then vanished with no
+                // diagnostic at all.
+                else if (vmessItem.configType == EConfigType.Hysteria2
+                      || vmessItem.configType == EConfigType.Mieru
+                      || vmessItem.configType == EConfigType.TUIC
+                      || vmessItem.configType == EConfigType.AnyTLS
                       || vmessItem.configType == EConfigType.Naive)
                 {
-                    // This chain has no `else`, so a config type missing from it is
-                    // parsed and then silently dropped -- nothing is stored and the
-                    // caller sees 0, then falls through to the base64/SIP008/custom
-                    // parsers and reports -1. That is exactly what anytls:// and
-                    // naive+https:// did: ImportFromClipboardConfig returned a valid
-                    // item and it went nowhere. Both use the password-in-`id` layout
-                    // of the protocols above, so they take the same AddServer path.
-                    if (AddServer(ref config, vmessItem, false) == 0)
+                    if (AddTypedServer(ref config, vmessItem, vmessItem.configType, false) == 0)
                     {
                         countServers++;
                     }

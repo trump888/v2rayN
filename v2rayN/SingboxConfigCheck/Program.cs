@@ -199,6 +199,26 @@ namespace SingboxConfigCheck
                 }
             }
 
+            // The same defect hit Hysteria2, Mieru and TUIC before AnyTLS and Naive:
+            // AddServer stamps configType = VMess and rejects an empty `security`, so
+            // they could not be stored from a link either. Assert the type survives
+            // for every protocol that goes through AddTypedServer.
+            foreach (var (link, expected) in new[]
+            {
+                ("hysteria2://pw@h.example.com:443#H1", EConfigType.Hysteria2),
+                ("mieru://h.example.com:443?password=pw#M1", EConfigType.Mieru),
+                ("tuic://h.example.com:443?uuid=u&password=pw#T1", EConfigType.TUIC),
+                ("anytls://h.example.com:443#A1", EConfigType.AnyTLS),
+                ("naive+https://h.example.com:443#N1", EConfigType.Naive),
+            })
+            {
+                var c = new Config { vmess = new List<VmessItem>(), subItem = new List<SubItem>() };
+                var n = ConfigHandler.AddBatchServers(ref c, link, "", "g4");
+                var got = c.vmess.FirstOrDefault()?.configType;
+                Check(n == 1 && got == expected,
+                      $"{expected} link imports and keeps its type (returned {n}, got {got})");
+            }
+
             // A whole subscription payload: many links, newline separated. This is
             // what a real subscription paste looks like.
             var bulk = string.Join(Environment.NewLine, new[]

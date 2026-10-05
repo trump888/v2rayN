@@ -472,7 +472,9 @@ namespace v2rayN.Forms
                 case EConfigType.TUIC:
                 case EConfigType.AnyTLS:
                 case EConfigType.Naive:
-                    ret = ConfigHandler.AddServer(ref config, vmessItem);
+                    // AddServer would stamp configType = VMess and reject the empty
+                    // `security` these protocols leave; see AddTypedServer.
+                    ret = ConfigHandler.AddTypedServer(ref config, vmessItem, eConfigType);
                     break;
             }
 
