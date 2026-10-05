@@ -224,6 +224,12 @@ jobs:
         $superseded = @{
           'Dreamacro/clash'       = 'MetaCubeX/mihomo'
           'MetaCubeX/Clash.Meta'  = 'MetaCubeX/mihomo'
+        }
+        # Superseded, so the successor is what gets offered -- but the old entry is
+        # kept registered on purpose, because it is still downloadable and removing it
+        # would break profiles that pin coreType to it. It must still not be offered
+        # for new selections.
+        $supersededButKept = @{
           'SagerNet/v2ray-core'   = 'v2fly/v2ray-core'
         }
 
@@ -242,6 +248,14 @@ jobs:
             exit 1
           }
           Write-Host ("  ok       {0,-30} superseded by {1}, not offered" -f $r, $superseded[$r])
+        }
+        foreach ($r in $supersededButKept.Keys) {
+          $slug = $r.Split('/')[1]
+          if ($offered -contains $slug) {
+            Write-Error "$r has a successor ($($supersededButKept[$r])) and must not be offered for new selections"
+            exit 1
+          }
+          Write-Host ("  ok       {0,-30} superseded by {1}, kept registered, not offered" -f $r, $supersededButKept[$r])
         }
         foreach ($r in $retained.Keys) {
           $slug = $r.Split('/')[1]

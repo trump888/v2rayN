@@ -143,37 +143,39 @@ share-link parser per core, plus the UI to expose it. It is not a merge; the 5.x
 UI has no equivalent of the newer profile editor. Treated as its own piece of
 work, not a drive-by.
 
-## Broken cores — found, and mostly fixed
+## Dead cores: what was kept and why
 
-The liveness check reports these on every build. The first survey found more
-than it first looked, because a core can be broken in ways a green repository
-says nothing about.
+Policy: a core whose project is gone **and that has a successor** is replaced by
+the successor; one with **no successor** is kept.
 
-| Core | Problem | Resolution |
-| --- | --- | --- |
-| `Dreamacro/clash` | repository deleted (404) | removed from the UI |
-| `zzzgydi/mieru` | repository deleted (404) | removed from the UI |
-| `SagerNet/v2ray-core` | last push 2022-07-30; `v2fly/v2ray-core` already offered | removed from the UI |
-| **`mihomo`** | **was offered in the UI but had no `CoreInfo` registered at all** — selecting it could not resolve a core | now registered, with current asset and exe names |
-| **`clash_meta`** | downloaded *successfully* (GitHub redirects `Clash.Meta` → `mihomo`) but its `Clash.Meta-*` exe names no longer match the `mihomo-windows-amd64.exe` the repo publishes, so the binary was never found | superseded by `mihomo`; removed from the UI |
+| Core | Project state | Successor | Outcome |
+| --- | --- | --- | --- |
+| `clash` | `Dreamacro/clash` **404**, deleted | `MetaCubeX/mihomo` | not offered, registration removed |
+| `clash_meta` | redirects to mihomo, but the release no longer contains any `Clash.Meta-*` executable | `MetaCubeX/mihomo` | not offered, registration removed |
+| `SagerNet` | `SagerNet/v2ray-core` last push 2022-07-30 | `v2fly/v2ray-core` | not offered, **registration kept** |
+| `mieru` | `zzzgydi/mieru` **404** | **none** | **kept and offered** |
 
-That last two are the interesting ones: both compile, both run, and both only
-fail when a user clicks. A repository-liveness check cannot see either.
+Two judgement calls worth stating:
 
-`ECoreType` values are **not** renumbered — they are persisted in existing server
-configurations, so renumbering would silently repoint every saved profile. The
-dead enum values and their `CoreInfo` registrations are kept, so an exe already
-downloaded under one of those names keeps working for a profile that still
-references it. Only the UI lists changed.
+**`SagerNet` keeps its registration** even though v2fly supersedes it. It is
+still downloadable, it is referenced from five places including the update
+logic, and removing it would break any profile pinning `coreType` to it for no
+gain. The successor is what gets offered, which is the part of the policy that
+matters for new users.
 
-`Global.coreTypes` is now the single source of truth for what the UI offers.
-`AddServer2Form` used to build a second list from
-`Enum.GetValues(typeof(ECoreType))`, which is why the two dropdowns disagreed and
-why `mihomo` could appear in one and not the other.
+**`mieru` is kept offered** even though upstream 7.x dropped it. Its repository
+is 404 and no successor exists — `daveparf/mieru` is 404 as well — and mieru is
+a protocol this build can speak. Dropping it would remove working functionality
+on the strength of someone else's decision.
 
-A new CI step, `Verify offered cores are registered`, asserts every offered core
-has a `CoreInfo` and that mihomo's exe name matches what the current release
-actually publishes.
+The policy is enforced by CI, not left to memory: the build fails if a superseded
+project reappears in `Global.coreTypes` or regains a `CoreUrl` it should not
+have, and fails if a no-successor core drops out of the offered list. That gate
+caught a real leftover on its first run — the dead `clashCoreUrl` /
+`clashMetaCoreUrl` constants, which nothing referenced but which were exactly how
+a superseded core gets reconnected by accident.
+
+## What was already broken here
 
 ## Honest note on "following the new version"
 
