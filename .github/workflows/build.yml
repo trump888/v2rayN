@@ -343,6 +343,30 @@ jobs:
         Write-Host "offered to the UI : $($offered.Count)"
         Write-Host "registered        : $($registered.Count)"
 
+        # Every ECoreType named anywhere in the source must be registered, not just
+        # the offered ones. Removing a registration silently breaks every *reference*
+        # to it -- which happened here: removing clash and clash_meta left
+        # ConfigHandler's Clash-YAML import pointing at ECoreType.clash with no
+        # registration behind it, so importing a Clash config produced a server
+        # whose core did not exist, and two toolbar handlers called CheckUpdateCore
+        # with an unregistered type.
+        $srcRoot = 'v2rayN/v2rayN'
+        $referenced = Get-ChildItem $srcRoot -Recurse -Filter *.cs |
+                      ForEach-Object { [regex]::Matches((Get-Content $_.FullName -Raw), 'ECoreType\.(\w+)') } |
+                      ForEach-Object { $_.Groups[1].Value } | Sort-Object -Unique
+        # These three are deliberately unregistered: clash and clash_meta are
+        # superseded and kept only as enum values for old saved profiles, so they
+        # appear in legacy switch arms that can no longer be reached.
+        $allowMissing = @('clash', 'clash_meta')
+
+        $unregistered = @($referenced | Where-Object { $registered -notcontains $_ -and $allowMissing -notcontains $_ })
+        if ($unregistered) {
+          $unregistered | ForEach-Object { Write-Host "  ECoreType.$_ is referenced in source but has no CoreInfo registration" }
+          Write-Error "source references unregistered core types"
+          exit 1
+        }
+        Write-Host "referenced in source: $($referenced.Count), all registered (excluding $($allowMissing -join ', '), superseded)"
+
         $errors = @()
         foreach ($c in $offered) {
           if ($registered -notcontains $c) {

@@ -388,6 +388,7 @@ namespace v2rayN.Handler
                         break;
                     case ECoreType.clash:
                     case ECoreType.clash_meta:
+                    case ECoreType.mihomo:
                         version = Regex.Match(echo, $"v[0-9.]+").Groups[0].Value;
                         break;
                 }
@@ -434,6 +435,7 @@ namespace v2rayN.Handler
                         }
                     case ECoreType.clash:
                     case ECoreType.clash_meta:
+                    case ECoreType.mihomo:
                         {
                             curVersion = getCoreVersion(type);
                             message = string.Format(ResUI.IsLatestCore, curVersion);

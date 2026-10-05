@@ -1130,6 +1130,7 @@ namespace v2rayN.Handler
                             break;
                         case ECoreType.clash:
                         case ECoreType.clash_meta:
+                        case ECoreType.mihomo:
                             //remove the original 
                             var indexPort = fileContent.FindIndex(t => t.Contains("port:"));
                             if (indexPort >= 0)

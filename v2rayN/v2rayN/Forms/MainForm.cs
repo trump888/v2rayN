@@ -1425,14 +1425,13 @@ namespace v2rayN.Forms
             CheckUpdateCore(ECoreType.Xray);
         }
 
+        // Both were Dreamacro/clash (404) and MetaCubeX/Clash.Meta (no longer ships a
+        // Clash.Meta-* executable). Their registrations are gone, so calling
+        // CheckUpdateCore with them resolved to no CoreInfo. mihomo is the successor
+        // for both. One handler rather than two, because there is one core now.
         private void tsbCheckUpdateClashCore_Click(object sender, EventArgs e)
         {
-            CheckUpdateCore(ECoreType.clash);
-        }
-
-        private void tsbCheckUpdateClashMetaCore_Click(object sender, EventArgs e)
-        {
-            CheckUpdateCore(ECoreType.clash_meta);
+            CheckUpdateCore(ECoreType.mihomo);
         }
 
         private void CheckUpdateCore(ECoreType type)

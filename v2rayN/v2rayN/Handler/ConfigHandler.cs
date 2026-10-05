@@ -1040,7 +1040,10 @@ namespace v2rayN.Handler
                 var fileName = Utils.GetTempPath($"{Utils.GetGUID(false)}.yaml");
                 File.WriteAllText(fileName, clipboardData);
 
-                vmessItem.coreType = ECoreType.clash;
+                // mihomo, not clash: Dreamacro/clash is 404 and its registration was
+                // removed, so this would have resolved to no core at all. mihomo is
+                // the Clash-format successor and reads the same YAML.
+                vmessItem.coreType = ECoreType.mihomo;
                 vmessItem.address = fileName;
                 vmessItem.remarks = "clash_custom";
             }
