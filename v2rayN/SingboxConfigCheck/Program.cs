@@ -68,6 +68,10 @@ namespace SingboxConfigCheck
             NaiveRoundTrip(outDir);
 
             Console.WriteLine();
+            Console.WriteLine("== wireguard ==");
+            WireGuard(outDir);
+
+            Console.WriteLine();
             Console.WriteLine("== masque ==");
             Masque(outDir);
 
@@ -188,6 +192,70 @@ namespace SingboxConfigCheck
             Check(rc2 == 0, "GenerateClientConfig still succeeds for VMess");
             Check(v2rayContent.Contains("\"outbounds\"") && !v2rayContent.Contains("\"anytls\""),
                   "VMess still generates v2ray JSON");
+        }
+
+        /// <summary>
+        /// WireGuard. A sing-box endpoint, so the shape is unlike the other three --
+        /// and two of its requirements are not discoverable from the struct: the peer's
+        /// address field is "address", not "server", and allowed_ips is mandatory
+        /// (sing-box exits with "missing allowed ips for peer 0" without it).
+        /// Both were found by running `sing-box check` against candidate shapes.
+        /// </summary>
+        private static void WireGuard(string outDir)
+        {
+            var priv = Convert.ToBase64String(Enumerable.Repeat((byte)0x11, 32).ToArray());
+            var pub = Convert.ToBase64String(Enumerable.Repeat((byte)0x22, 32).ToArray());
+
+            const string link = "wireguard://" + "cHJpdg%3D%3D@wg.example.com:51820" +
+                "?publickey=cHVi&presharedkey=cHNr&address=172.16.0.2%2F32" +
+                "&reserved=1%2C2%2C3&mtu=1408&dns=1.1.1.1#WG";
+
+            var item = ShareHandler.ImportFromClipboardConfig(link, out var msg);
+            Check(item != null, $"wireguard:// imports (msg: {msg})");
+            if (item == null) { return; }
+            Check(item.configType == EConfigType.WireGuard, "imported type is WireGuard");
+            Check(item.address == "wg.example.com" && item.port == 51820, "peer address and port");
+            Check(item.id == "cHJpdg==", $"private key decodes (got '{item.id}')");
+            Check(item.publicKey == "cHVi", "public key");
+            Check(item.preSharedKey == "cHNr", "pre-shared key");
+            Check(item.interfaceAddress == "172.16.0.2/32", $"interface address (got '{item.interfaceAddress}')");
+            Check(item.reserved == "1,2,3", $"reserved (got '{item.reserved}')");
+            Check(item.mtu == 1408, $"mtu (got {item.mtu})");
+            Check(item.dns == "1.1.1.1", "dns");
+
+            var again = ShareHandler.ImportFromClipboardConfig(ShareHandler.GetShareUrl(item), out _);
+            Check(again != null && again.id == item.id && again.address == item.address
+                  && again.publicKey == item.publicKey && again.interfaceAddress == item.interfaceAddress
+                  && again.reserved == item.reserved && again.mtu == item.mtu && again.dns == item.dns,
+                  "wireguard survives an export/import cycle unchanged");
+
+            var cfg = new Config
+            {
+                inbound = new List<InItem>
+                {
+                    new InItem { protocol = Global.InboundSocks, localPort = 10808, udpEnabled = true, sniffingEnabled = true },
+                },
+            };
+            LazyConfig.Instance.SetConfig(ref cfg);
+            var file = Path.Combine(outDir, "wireguard.json");
+            var rc = V2rayConfigHandler.GenerateClientConfig(item, file, out var genMsg, out _);
+            Check(rc == 0, $"WireGuard generates (msg: {genMsg})");
+            if (rc != 0 || !File.Exists(file)) { return; }
+
+            var json = File.ReadAllText(file);
+            Check(json.Contains("\"type\": \"wireguard\""), "endpoint is a wireguard endpoint");
+            Check(json.Contains("\"private_key\": \"cHJpdg==\""), "private key emitted");
+            Check(json.Contains("\"address\": \"wg.example.com\""), "peer address uses \"address\", not \"server\"");
+            Check(json.Contains("\"allowed_ips\""), "allowed_ips present (sing-box refuses to start without it)");
+            Check(json.Contains("\"0.0.0.0/0\""), "allowed_ips defaults to both families");
+            Check(json.Contains("\"reserved\""), "reserved emitted");
+            Check(json.Contains("\"mtu\": 1408"), "mtu emitted");
+            Check(json.Contains("\"network\": \"udp\""), "the route rule matches udp, not quic");
+
+            Check(SingboxConfigHandler.IsEndpointType(EConfigType.WireGuard), "WireGuard is an endpoint type");
+            Check(SingboxConfigHandler.IsSingboxOnly(EConfigType.WireGuard), "WireGuard routes to the sing-box generator");
+            Check(!SingboxConfigHandler.IsEndpointType(EConfigType.AnyTLS), "AnyTLS is not an endpoint type");
+            Check((int)EConfigType.WireGuard == 9, "WireGuard is 9");
         }
 
         /// <summary>

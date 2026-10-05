@@ -107,6 +107,9 @@ namespace v2rayN.Handler
                     case EConfigType.MASQUE:
                         url = ShareMasque(item);
                         break;
+                    case EConfigType.WireGuard:
+                        url = ShareWireGuard(item);
+                        break;
                     case EConfigType.Mieru:
                         url = ShareMieru(item);
                         break;
@@ -390,6 +393,34 @@ namespace v2rayN.Handler
             return url;
         }
 
+        private static string ShareWireGuard(VmessItem item)
+        {
+            string remark = string.Empty;
+            if (!Utils.IsNullOrEmpty(item.remarks))
+            {
+                remark = "#" + Utils.UrlEncode(item.remarks);
+            }
+
+            // Parameter names match 7.x's WireguardFmt so links move between builds.
+            var dicQuery = new Dictionary<string, string>();
+            if (!Utils.IsNullOrEmpty(item.publicKey)) dicQuery["publickey"] = item.publicKey;
+            if (!Utils.IsNullOrEmpty(item.preSharedKey)) dicQuery["presharedkey"] = item.preSharedKey;
+            if (!Utils.IsNullOrEmpty(item.interfaceAddress)) dicQuery["address"] = item.interfaceAddress;
+            if (!Utils.IsNullOrEmpty(item.reserved)) dicQuery["reserved"] = item.reserved;
+            if (!Utils.IsNullOrEmpty(item.allowedIps)) dicQuery["allowedips"] = item.allowedIps;
+            if (!Utils.IsNullOrEmpty(item.dns)) dicQuery["dns"] = item.dns;
+            if (item.mtu > 0) dicQuery["mtu"] = item.mtu.ToString();
+
+            string query = dicQuery.Count > 0 ? "?" + string.Join("&", dicQuery.Select(x => x.Key + "=" + Utils.UrlEncode(x.Value)).ToArray()) : "";
+
+            // wireguard://<privatekey>@<peer>:<port>[?query][#remark]
+            var url = string.Format("{0}@{1}:{2}",
+            Utils.UrlEncode(item.id),
+            GetIpv6(item.address),
+            item.port);
+            return $"{Global.wireguardProtocol}{url}{query}{remark}";
+        }
+
         private static string ShareVLESS(VmessItem item)
         {
             string url = string.Empty;
@@ -638,6 +669,16 @@ namespace v2rayN.Handler
                 {
                     Utils.SaveLog($"Try parse naive: {result.Substring(0, Math.Min(100, result.Length))}");
                     vmessItem = ResolveNaive(result);
+                    if (vmessItem == null)
+                    {
+                        msg = ResUI.ConfigurationFormatIncorrect;
+                        return null;
+                    }
+                }
+                else if (result.StartsWith(Global.wireguardProtocol, StringComparison.OrdinalIgnoreCase))
+                {
+                    Utils.SaveLog($"Try parse wireguard: {result.Substring(0, Math.Min(100, result.Length))}");
+                    vmessItem = ResolveWireGuard(result);
                     if (vmessItem == null)
                     {
                         msg = ResUI.ConfigurationFormatIncorrect;
@@ -1113,6 +1154,35 @@ namespace v2rayN.Handler
             {
                 item.allowInsecure = query["insecure"];
             }
+
+            return item;
+        }
+
+        private static VmessItem ResolveWireGuard(string result)
+        {
+            VmessItem item = new VmessItem
+            {
+                configType = EConfigType.WireGuard
+            };
+
+            var url = TryParseUri(result, Global.wireguardProtocol);
+            if (url == null) return null;
+
+            item.address = url.IdnHost;
+            item.port = url.Port;
+            item.remarks = url.GetComponents(UriComponents.Fragment, UriFormat.Unescaped);
+            // The private key is the credential and lives in `id`.
+            item.id = Utils.UrlDecode(url.UserInfo);
+
+            var query = HttpUtility.ParseQueryString(url.Query);
+            item.publicKey = Utils.UrlDecode(query["publickey"] ?? "");
+            item.preSharedKey = Utils.UrlDecode(query["presharedkey"] ?? "");
+            item.interfaceAddress = Utils.UrlDecode(query["address"] ?? "");
+            item.reserved = Utils.UrlDecode(query["reserved"] ?? "");
+            item.allowedIps = Utils.UrlDecode(query["allowedips"] ?? "");
+            item.dns = Utils.UrlDecode(query["dns"] ?? "");
+            var mtu = Utils.UrlDecode(query["mtu"] ?? "");
+            if (int.TryParse(mtu, out var mtuVal)) item.mtu = mtuVal;
 
             return item;
         }

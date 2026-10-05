@@ -33,7 +33,8 @@ namespace v2rayN.Handler
         public static bool IsSingboxOnly(EConfigType configType)
             => configType == EConfigType.AnyTLS
             || configType == EConfigType.Naive
-            || configType == EConfigType.MASQUE;
+            || configType == EConfigType.MASQUE
+            || configType == EConfigType.WireGuard;
 
         /// <summary>
         /// Protocols that sing-box models as an <c>endpoints</c> entry rather than an
@@ -41,7 +42,7 @@ namespace v2rayN.Handler
         /// masque.RegisterEndpoint and is typed "masque-client".
         /// </summary>
         public static bool IsEndpointType(EConfigType configType)
-            => configType == EConfigType.MASQUE;
+            => configType == EConfigType.MASQUE || configType == EConfigType.WireGuard;
 
         /// <summary>
         /// Build a complete sing-box configuration for a single server.
@@ -91,10 +92,11 @@ namespace v2rayN.Handler
                 };
                 if (viaEndpoint)
                 {
-                    // An endpoint is only reachable through a route rule.
+                    // An endpoint is only reachable through a route rule. MASQUE is a
+                    // QUIC-based proxy so the rule matches quic; WireGuard is UDP-only.
                     rules.Add(new JObject
                     {
-                        ["network"] = "quic",
+                        ["network"] = item.configType == EConfigType.WireGuard ? "udp" : "quic",
                         ["outbound"] = "proxy-endpoint",
                     });
                 }
@@ -134,6 +136,11 @@ namespace v2rayN.Handler
         /// </summary>
         public static JObject GenEndpoint(VmessItem item)
         {
+            if (item.configType == EConfigType.WireGuard)
+            {
+                return GenWireGuardEndpoint(item);
+            }
+
             var endpoint = new JObject
             {
                 ["type"] = "masque-client",
@@ -169,6 +176,97 @@ namespace v2rayN.Handler
         }
 
         /// <summary>
+        /// WireGuard as a sing-box endpoint.
+        ///
+        /// Shape taken from option/wireguard.go and then confirmed against
+        /// sing-box 1.14.2 with `sing-box check`, because the obvious guesses are
+        /// wrong: there is no "server" field on the endpoint (the peer's address
+        /// field is simply "address", not "server"), and sing-box rejects the whole
+        /// config with "missing allowed ips for peer 0" if allowed_ips is absent --
+        /// which no amount of reading the struct would have told you, because it is
+        /// not expressed in the type.
+        /// </summary>
+        public static JObject GenWireGuardEndpoint(VmessItem item)
+        {
+            var endpoint = new JObject
+            {
+                ["type"] = "wireguard",
+                ["tag"] = "proxy-endpoint",
+                // Required by sing-box. The private key is the credential, so it
+                // lives in `id` like every other protocol here.
+                ["private_key"] = item.id ?? string.Empty,
+            };
+
+            var address = item.interfaceAddress;
+            if (!string.IsNullOrEmpty(address))
+            {
+                endpoint["address"] = new JArray(address
+                    .Split(',')
+                    .Select(x => x.Trim())
+                    .Where(x => x.Length > 0));
+            }
+
+            if (item.mtu > 0)
+            {
+                endpoint["mtu"] = item.mtu;
+            }
+
+            var peer = new JObject
+            {
+                ["address"] = item.address,
+                ["port"] = item.port,
+            };
+            if (!string.IsNullOrEmpty(item.publicKey))
+            {
+                peer["public_key"] = item.publicKey;
+            }
+            if (!string.IsNullOrEmpty(item.preSharedKey))
+            {
+                peer["pre_shared_key"] = item.preSharedKey;
+            }
+
+            // Required. Defaults to both families, which is what a full-tunnel
+            // WireGuard peer means; omitting it makes sing-box refuse to start.
+            var allowed = !string.IsNullOrEmpty(item.allowedIps)
+                ? item.allowedIps
+                : "0.0.0.0/0,::/0";
+            peer["allowed_ips"] = new JArray(allowed
+                .Split(',')
+                .Select(x => x.Trim())
+                .Where(x => x.Length > 0));
+
+            var reserved = ParseReserved(item.reserved);
+            if (reserved.Count > 0)
+            {
+                peer["reserved"] = new JArray(reserved);
+            }
+
+            endpoint["peers"] = new JArray { peer };
+            return endpoint;
+        }
+
+        /// <summary>
+        /// Reserved bytes, comma separated. sing-box wants []uint8, so anything
+        /// outside 0-255 is dropped rather than emitting a config that cannot start.
+        /// </summary>
+        private static List<int> ParseReserved(string? raw)
+        {
+            var list = new List<int>();
+            if (string.IsNullOrEmpty(raw))
+            {
+                return list;
+            }
+            foreach (var part in raw.Split(','))
+            {
+                if (int.TryParse(part.Trim(), out var v) && v >= 0 && v <= 255)
+                {
+                    list.Add(v);
+                }
+            }
+            return list;
+        }
+
+        /// <summary>
         /// "user:pass" or just "pass", matching 7.x's NaiveFmt/MasqueFmt: a colon
         /// means the first half is the username, otherwise the whole thing is the
         /// password.
@@ -199,6 +297,12 @@ namespace v2rayN.Handler
         /// </summary>
         public static JObject GenOutbound(VmessItem item)
         {
+            if (IsEndpointType(item.configType))
+            {
+                throw new ArgumentException(
+                    $"{item.configType} is a sing-box endpoint, not an outbound; use GenEndpoint.");
+            }
+
             var outbound = new JObject
             {
                 // sing-box has no MASQUE outbound and never has: verified against

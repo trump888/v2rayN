@@ -686,7 +686,53 @@ namespace v2rayN.Mode
         public string obfs { get; set; }
         public string certSha256 { get; set; }
         public string ech { get; set; }
-    }
+    
+        #region WireGuard
+        /// <summary>
+        /// WireGuard peer / interface settings. 7.x keeps these on ProtocolExtraItem,
+        /// which does not exist in 5.39, so they live here. The private key reuses
+        /// `id`, the same convention every other protocol uses for its credential.
+        /// </summary>
+        public string publicKey
+        {
+            get;
+            set;
+        }
+        public string preSharedKey
+        {
+            get;
+            set;
+        }
+        /// <summary>Interface address, CIDR. May be a comma separated list.</summary>
+        public string interfaceAddress
+        {
+            get;
+            set;
+        }
+        /// <summary>Peer reserved bytes, comma separated (0-255).</summary>
+        public string reserved
+        {
+            get;
+            set;
+        }
+        /// <summary>Peer allowed IPs, comma separated. sing-box requires this.</summary>
+        public string allowedIps
+        {
+            get;
+            set;
+        }
+        public int mtu
+        {
+            get;
+            set;
+        }
+        public string dns
+        {
+            get;
+            set;
+        }
+        #endregion WireGuard
+}
 
     [Serializable]
     public class InItem

@@ -206,6 +206,7 @@ namespace v2rayN
         public const string naiveProtocol = "naive+https://";
         public const string naiveQuicProtocol = "naive+quic://";
         public const string masqueProtocol = "masque://";
+        public const string wireguardProtocol = "wireguard://";
         /// <summary>
         /// hysteria2
         /// </summary>

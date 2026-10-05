@@ -39,7 +39,8 @@ namespace v2rayN.Forms
             if (eConfigType == EConfigType.Hysteria2 || eConfigType == EConfigType.Mieru
                 || eConfigType == EConfigType.TUIC || eConfigType == EConfigType.AnyTLS
                 || eConfigType == EConfigType.Naive
-                || eConfigType == EConfigType.MASQUE)
+                || eConfigType == EConfigType.MASQUE
+                || eConfigType == EConfigType.WireGuard)
             {
                 int yPos = 120;
 
@@ -219,6 +220,7 @@ namespace v2rayN.Forms
                 case EConfigType.AnyTLS:
                 case EConfigType.Naive:
                 case EConfigType.MASQUE:
+                case EConfigType.WireGuard:
                     panVmess.Dock = DockStyle.Fill;
                     panVmess.Visible = true;
                     break;
@@ -274,6 +276,7 @@ namespace v2rayN.Forms
                 case EConfigType.AnyTLS:
                 case EConfigType.Naive:
                 case EConfigType.MASQUE:
+                case EConfigType.WireGuard:
                     txtId.Text = vmessItem.id;
                     if (txtSni != null) txtSni.Text = vmessItem.sni ?? "";
                     if (cmbFingerprint != null) cmbFingerprint.Text = vmessItem.fingerprint ?? "";
@@ -375,6 +378,7 @@ namespace v2rayN.Forms
                 case EConfigType.AnyTLS:
                 case EConfigType.Naive:
                 case EConfigType.MASQUE:
+                case EConfigType.WireGuard:
                     id = txtId.Text;
                     break;
             }
