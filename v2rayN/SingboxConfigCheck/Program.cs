@@ -68,6 +68,10 @@ namespace SingboxConfigCheck
             NaiveRoundTrip(outDir);
 
             Console.WriteLine();
+            Console.WriteLine("== validation ==");
+            Validation();
+
+            Console.WriteLine();
             Console.WriteLine("== transports ==");
             Transports();
 
@@ -200,6 +204,124 @@ namespace SingboxConfigCheck
             Check(rc2 == 0, "GenerateClientConfig still succeeds for VMess");
             Check(v2rayContent.Contains("\"outbounds\"") && !v2rayContent.Contains("\"anytls\""),
                   "VMess still generates v2ray JSON");
+        }
+
+        /// <summary>
+        /// The validator, exercised against the exact shapes that used to fail
+        /// silently. Each of these produced a working-looking app and a dead node
+        /// before NodeValidator existed.
+        /// </summary>
+        private static void Validation()
+        {
+            // Reality with no pbk/sid: the flagship silent failure.
+            var noRealityKeys = new VmessItem
+            {
+                configType = EConfigType.VLESS,
+                address = "a.example",
+                port = 443,
+                id = "11111111-2222-3333-4444-555555555555",
+                streamSecurity = "reality",
+                sni = "www.microsoft.com",
+            };
+            var r1 = NodeValidator.Validate(noRealityKeys);
+            Check(!r1.IsValid, "Reality without pbk/sid is rejected");
+            Check(r1.Errors.Any(e => e.Contains("pbk")), "  and says the public key is the problem");
+            Check(r1.Errors.Any(e => e.Contains("sid")), "  and the short id");
+
+            var goodReality = new VmessItem
+            {
+                configType = EConfigType.VLESS,
+                address = "a.example",
+                port = 443,
+                id = "11111111-2222-3333-4444-555555555555",
+                streamSecurity = "reality",
+                sni = "www.microsoft.com",
+                publicKey = "PUBKEY",
+                shortId = "0123456789abcdef",
+                fingerprint = "chrome",
+            };
+            Check(NodeValidator.Validate(goodReality).IsValid, "a complete Reality profile validates");
+
+            // Hysteria2 with no password -- the bug that made it store as VMess.
+            var noHy2 = new VmessItem { configType = EConfigType.Hysteria2, address = "h.example", port = 443 };
+            Check(!NodeValidator.Validate(noHy2).IsValid, "Hysteria2 without a password is rejected");
+
+            // Shadowsocks with a password but no method.
+            var noMethod = new VmessItem { configType = EConfigType.Shadowsocks, address = "s.example", port = 443, id = "pw" };
+            Check(NodeValidator.Validate(noMethod).Errors.Any(e => e.Contains("method")), "Shadowsocks without a method is rejected");
+
+            // VMess id that is not a UUID.
+            var badUuid = new VmessItem { configType = EConfigType.VMess, address = "v.example", port = 443, id = "not-a-uuid" };
+            Check(NodeValidator.Validate(badUuid).Errors.Any(e => e.Contains("UUID")), "a non-UUID VMess id is rejected");
+
+            // WireGuard: sing-box needs the peer key and an interface address.
+            var noWg = new VmessItem { configType = EConfigType.WireGuard, address = "w.example", port = 51820, id = "priv" };
+            var rWg = NodeValidator.Validate(noWg);
+            Check(rWg.Errors.Any(e => e.Contains("peer public key")), "WireGuard without the peer public key is rejected");
+            Check(rWg.Errors.Any(e => e.Contains("interface address")), "  and without an interface address");
+            Check(rWg.Warnings.Any(w => w.Contains("allowed IPs")), "  and warns about empty allowed IPs");
+
+            // xhttp extra that is not JSON is passed straight through to Xray, so it
+            // has to be caught here.
+            var badExtra = new VmessItem
+            {
+                configType = EConfigType.VLESS,
+                address = "x.example",
+                port = 443,
+                id = "11111111-2222-3333-4444-555555555555",
+                network = "xhttp",
+                xhttpExtra = "{not json",
+            };
+            Check(NodeValidator.Validate(badExtra).Errors.Any(e => e.Contains("extra")), "xhttp with invalid extra JSON is rejected");
+
+            var badMode = new VmessItem
+            {
+                configType = EConfigType.VLESS,
+                address = "x.example",
+                port = 443,
+                id = "11111111-2222-3333-4444-555555555555",
+                network = "xhttp",
+                xhttpMode = "nonsense",
+            };
+            Check(NodeValidator.Validate(badMode).Errors.Any(e => e.Contains("xhttp mode")), "an unknown xhttp mode is rejected");
+
+            // An unrecognised transport falls back to tcp silently.
+            var oddTransport = new VmessItem
+            {
+                configType = EConfigType.VLESS,
+                address = "o.example",
+                port = 443,
+                id = "11111111-2222-3333-4444-555555555555",
+                network = "not-a-transport",
+            };
+            Check(NodeValidator.Validate(oddTransport).Warnings.Any(w => w.Contains("not recognised")),
+                  "an unrecognised transport warns instead of silently becoming tcp");
+
+            // Port range and empty address.
+            Check(NodeValidator.Validate(new VmessItem { configType = EConfigType.VMess, address = "", port = 0 })
+                    .Errors.Count >= 2, "empty address and bad port are both reported");
+            Check(NodeValidator.Validate(null!).Errors.Count == 1, "a null profile is rejected, not thrown on");
+
+            // Every protocol this branch can generate must accept a minimal valid
+            // profile -- otherwise the validator is over-strict and would block
+            // working nodes.
+            foreach (var (ct, ok) in new (EConfigType, VmessItem)[]
+            {
+                (EConfigType.VMess, new VmessItem { configType = EConfigType.VMess, address = "a", port = 1, id = "11111111-2222-3333-4444-555555555555" }),
+                (EConfigType.VLESS, new VmessItem { configType = EConfigType.VLESS, address = "a", port = 1, id = "id" }),
+                (EConfigType.Trojan, new VmessItem { configType = EConfigType.Trojan, address = "a", port = 1, id = "id" }),
+                (EConfigType.Shadowsocks, new VmessItem { configType = EConfigType.Shadowsocks, address = "a", port = 1, id = "id", security = "aes-128-gcm" }),
+                (EConfigType.Hysteria2, new VmessItem { configType = EConfigType.Hysteria2, address = "a", port = 1, id = "id" }),
+                (EConfigType.TUIC, new VmessItem { configType = EConfigType.TUIC, address = "a", port = 1, id = "id" }),
+                (EConfigType.AnyTLS, new VmessItem { configType = EConfigType.AnyTLS, address = "a", port = 1, id = "id" }),
+                (EConfigType.Naive, new VmessItem { configType = EConfigType.Naive, address = "a", port = 1, id = "id" }),
+                (EConfigType.MASQUE, new VmessItem { configType = EConfigType.MASQUE, address = "a", port = 1, id = "id" }),
+                (EConfigType.Mieru, new VmessItem { configType = EConfigType.Mieru, address = "a", port = 1, id = "id" }),
+            })
+            {
+                var res = NodeValidator.Validate(ok);
+                Check(res.IsValid, $"minimal valid {ct} passes validation ({res})");
+            }
         }
 
         /// <summary>
