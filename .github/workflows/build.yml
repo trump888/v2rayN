@@ -350,22 +350,39 @@ jobs:
         # registration behind it, so importing a Clash config produced a server
         # whose core did not exist, and two toolbar handlers called CheckUpdateCore
         # with an unregistered type.
-        $srcRoot = 'v2rayN/v2rayN'
-        $referenced = Get-ChildItem $srcRoot -Recurse -Filter *.cs |
-                      ForEach-Object { [regex]::Matches((Get-Content $_.FullName -Raw), 'ECoreType\.(\w+)') } |
-                      ForEach-Object { $_.Groups[1].Value } | Sort-Object -Unique
-        # These three are deliberately unregistered: clash and clash_meta are
-        # superseded and kept only as enum values for old saved profiles, so they
-        # appear in legacy switch arms that can no longer be reached.
+        # Written with explicit loops rather than chained pipelines: the pipeline
+        # version died without a message on the first run, and a gate that cannot say
+        # why it failed is worse than no gate.
         $allowMissing = @('clash', 'clash_meta')
+        $referenced = New-Object 'System.Collections.Generic.HashSet[string]'
 
-        $unregistered = @($referenced | Where-Object { $registered -notcontains $_ -and $allowMissing -notcontains $_ })
-        if ($unregistered) {
-          $unregistered | ForEach-Object { Write-Host "  ECoreType.$_ is referenced in source but has no CoreInfo registration" }
-          Write-Error "source references unregistered core types"
-          exit 1
+        $files = Get-ChildItem 'v2rayN/v2rayN' -Recurse -Filter '*.cs' -File |
+                 Where-Object { $_.FullName -notmatch '[\\/](obj|bin)[\\/]' }
+        $unreadable = 0
+        foreach ($f in $files) {
+            $text = $null
+            try { $text = [System.IO.File]::ReadAllText($f.FullName) } catch { $unreadable++; continue }
+            if ($null -eq $text) { $unreadable++; continue }
+            foreach ($m in [regex]::Matches($text, 'ECoreType\.(\w+)')) {
+                [void]$referenced.Add($m.Groups[1].Value)
+            }
         }
-        Write-Host "referenced in source: $($referenced.Count), all registered (excluding $($allowMissing -join ', '), superseded)"
+        Write-Host "ECoreType values referenced in source: $($referenced.Count) (from $($files.Count) files, $unreadable unreadable)"
+
+        $unregistered = @()
+        foreach ($name in ($referenced | Sort-Object)) {
+            if ($registered -contains $name) { continue }
+            if ($allowMissing -contains $name) { continue }
+            $unregistered += $name
+        }
+        if ($unregistered.Count -gt 0) {
+            foreach ($n in $unregistered) {
+                Write-Host "  ECoreType.$n is referenced in source but has no CoreInfo registration"
+            }
+            Write-Error "source references $($unregistered.Count) unregistered core type(s)"
+            exit 1
+        }
+        Write-Host "all referenced core types are registered (excluding $($allowMissing -join ', '), superseded)"
 
         $errors = @()
         foreach ($c in $offered) {
