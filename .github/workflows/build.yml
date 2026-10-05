@@ -226,7 +226,7 @@ jobs:
         }
         foreach ($r in $expectAssets.Keys) {
           try {
-            $rel = Invoke-RestMethod 'https://api.github.com/repos/' + $r + '/releases/latest' -Headers $headers
+            $rel = Invoke-RestMethod "https://api.github.com/repos/$r/releases/latest" -Headers $headers
             $tag = $rel.tag_name
             $found = $false
             foreach ($a in $rel.assets) {
