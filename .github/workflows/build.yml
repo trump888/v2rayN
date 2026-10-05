@@ -495,7 +495,21 @@ jobs:
         $handoff = 'artifacts/singbox'
         New-Item -ItemType Directory -Force -Path $handoff | Out-Null
         Copy-Item $sb.FullName (Join-Path $handoff 'sing-box.exe') -Force
-        Write-Host "handed sing-box.exe to $handoff"
+        # libcronet.dll as well: the naive outbound is built on Chromium's Cronet,
+        # and sing-box resolves it from the executable directory or PATH at startup.
+        # Without it every naive config dies with "cronet: library not found" -- and
+        # `sing-box check` cannot see that, because check never constructs the
+        # outbound. This is also why libcronet.dll must stay in the published zip:
+        # it is not dead weight for naive users, whatever its size suggests.
+        $cronet = Get-ChildItem (Split-Path $sb.FullName) -Filter 'libcronet*.dll' -File -ErrorAction SilentlyContinue |
+                  Select-Object -First 1
+        if ($cronet) {
+          Copy-Item $cronet.FullName (Join-Path $handoff 'libcronet.dll') -Force
+          Write-Host "handed sing-box.exe + libcronet.dll to $handoff"
+        } else {
+          Write-Warning "libcronet.dll not found next to sing-box.exe; naive configs will fail at startup"
+          Write-Host "handed sing-box.exe to $handoff"
+        }
 
         # --- Validate MASQUE against a prebuilt sing-box that has it -----------
         # MASQUE is in sing-box master (e22cd5406, 2026-09-21) and is still ahead of
@@ -643,7 +657,9 @@ jobs:
 
         $runFailures = 0
         $port = 21000
+        $runIndex = 0
         foreach ($f in $sbAll) {
+          $runIndex++
           $useExe = if ($f.Name -match 'masque') { $nightly } else { $exe }
 
           # Give every run its own port. All the generated configs listen on the same
@@ -653,7 +669,9 @@ jobs:
           $port++
           $cfg = Get-Content $f.FullName -Raw | ConvertFrom-Json
           $cfg.inbounds[0].listen_port = $port
-          $runCfg = Join-Path $env:RUNNER_TEMP ("run-" + $f.Name)
+          # Indexed, not named after the file: one of them is 'naive-quic form.json'
+          # and a space in the path was silently truncated into a missing filename.
+          $runCfg = Join-Path $env:RUNNER_TEMP ("run-config-$runIndex.json")
           $cfg | ConvertTo-Json -Depth 20 | Set-Content -Path $runCfg -Encoding utf8
 
           # Capture sing-box's own output. Without this a failure is just "exited with
