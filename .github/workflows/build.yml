@@ -268,6 +268,12 @@ jobs:
     # `sing-box check` over everything the generator produces.
     - name: Verify generated sing-box configs
       shell: pwsh
+      # Artifact downloads from another repository require authentication, and
+      # GITHUB_TOKEN is not exposed to a step unless it is mapped explicitly here.
+      # Without it the MASQUE nightly download returns 401 "Requires
+      # authentication" and fails the step.
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         $ErrorActionPreference = 'Stop'
         $ProgressPreference = 'SilentlyContinue'
@@ -347,7 +353,7 @@ jobs:
         }
         Write-Host "looking for a sing-box nightly with MASQUE"
         $headers = @{ 'User-Agent' = 'v2rayN-net48-check' }
-        if ($env:GITHUB_TOKEN) { $headers['Authorization'] = "Bearer $env:GITHUB_TOKEN" }
+        if ($env:GITHUB_TOKEN) { $headers['Authorization'] = "token $env:GITHUB_TOKEN" }
 
         # Runs older than the MASQUE commit cannot contain it, so require that.
         # This also makes the selection deterministic: the API does not promise an
@@ -378,8 +384,14 @@ jobs:
         Write-Host "using sing-box nightly from run $($nightly.Run.id) ($($nightly.Run.head_sha.Substring(0,9)), $($nightly.Run.created_at))"
 
         $zipPath = Join-Path $env:RUNNER_TEMP 'sb-nightly.zip'
-        Invoke-WebRequest "https://api.github.com/repos/SagerNet/sing-box/actions/artifacts/$($nightly.Artifact.id)/zip" `
-          -Headers $headers -OutFile $zipPath
+        try {
+          Invoke-WebRequest "https://api.github.com/repos/SagerNet/sing-box/actions/artifacts/$($nightly.Artifact.id)/zip" `
+            -Headers $headers -OutFile $zipPath
+        } catch {
+          Write-Warning "could not download the sing-box nightly artifact: $($_.Exception.Message)"
+          Write-Warning "skipping the runtime MASQUE check; its shape is asserted structurally in the suite above"
+          return
+        }
         Expand-Archive -Force $zipPath (Join-Path $env:RUNNER_TEMP 'sb-nightly')
         $sbNightly = Get-ChildItem (Join-Path $env:RUNNER_TEMP 'sb-nightly') -Recurse -Filter '*.zip' -File |
                      Sort-Object Length -Descending | Select-Object -First 1
