@@ -757,8 +757,12 @@ namespace v2rayN.Handler
                 {
                     streamSettings.security = node.streamSecurity;
 
+                    // 7.x falls back to the user's configured default fingerprint.
+                    // 5.39's Config has no CoreBasicItem to read one from, so this
+                    // uses the first entry of the shared list -- same values, and
+                    // better than emitting an empty fingerprint.
                     var realityFingerprint = string.IsNullOrWhiteSpace(node.fingerprint)
-                        ? config.CoreBasicItem.defFingerprint
+                        ? Global.fingerprints[0]
                         : node.fingerprint;
 
                     streamSettings.realitySettings = new RealitySettings
