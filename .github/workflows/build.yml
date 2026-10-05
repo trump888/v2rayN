@@ -353,7 +353,10 @@ jobs:
         # It shipped once and was reported from a real 200% machine. The correct
         # fix needs both files plus EnableWindowsFormsHighDpiAutoResizing, and
         # verification on real 150% / 200% hardware, which CI cannot do at 100%.
-        $mfDpi = $mf -match 'PerMonitorV2'
+        # Match the element, not the word: the manifest's own comment explains why
+        # DPI awareness is off and mentions PerMonitorV2 while doing so, which the
+        # previous version of this check matched on.
+        $mfDpi = $mf -match '<dpiAwareness|<dpiAware\s'
         $appConfig = 'v2rayN/v2rayN/app.config'
         $cfgDpi = (Test-Path $appConfig) -and ((Get-Content $appConfig -Raw) -match 'DpiAwareness')
         Write-Host "  manifest PerMonitorV2: $mfDpi / app.config DpiAwareness: $cfgDpi"
@@ -371,13 +374,13 @@ jobs:
         $bytes = [System.IO.File]::ReadAllBytes($exe.FullName)
         $text = [System.Text.Encoding]::ASCII.GetString($bytes)
         $exeCfg = Join-Path $exe.DirectoryName 'v2rayN.exe.config'
-        if ($cfgDpi) {
-          if (-not (Test-Path $exeCfg)) { Write-Error "app.config exists but no v2rayN.exe.config was produced"; exit 1 }
-          $cfgText = Get-Content $exeCfg -Raw
-          if ($cfgText -notmatch 'DpiAwareness') { Write-Error "v2rayN.exe.config does not carry the DpiAwareness switch"; exit 1 }
-          Write-Host "  DpiAwareness present in v2rayN.exe.config"
+        $exeCfgDpi = (Test-Path $exeCfg) -and ((Get-Content $exeCfg -Raw) -match 'DpiAwareness')
+        Write-Host "  DpiAwareness in v2rayN.exe.config: $exeCfgDpi"
+        if ($cfgDpi -ne $exeCfgDpi) {
+          Write-Error "app.config declares DpiAwareness=$cfgDpi but the built v2rayN.exe.config has it=$exeCfgDpi"
+          exit 1
         }
-        foreach ($needle in @('PerMonitorV2', '8e0f7a12-bfb3-4fe8-b9a5-48fd50a15a9a')) {
+        foreach ($needle in @('8e0f7a12-bfb3-4fe8-b9a5-48fd50a15a9a')) {
           $found = $text.Contains($needle)
           Write-Host ("  {0,-40} embedded in v2rayN.exe: {1}" -f $needle, $found)
           if (-not $found) { Write-Error "$needle is not in the built exe; the manifest was not applied"; exit 1 }
