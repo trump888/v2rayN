@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using Newtonsoft.Json.Linq;
+using v2rayN.Base;
 using v2rayN.Mode;
 
 namespace v2rayN.Handler

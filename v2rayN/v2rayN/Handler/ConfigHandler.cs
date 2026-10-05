@@ -1027,22 +1027,27 @@ namespace v2rayN.Handler
                 var imported = SingboxConfigImporter.Resolve(clipboardData);
                 if (imported.Count > 0)
                 {
+                    // This method otherwise handles exactly one server and returns
+                    // 1 or -1, so the count is local rather than the shared
+                    // countServers the other importer uses.
+                    if (!Utils.IsNullOrEmpty(subid))
+                    {
+                        RemoveServerViaSubid(ref config, subid);
+                    }
+                    var added = 0;
                     foreach (var one in imported)
                     {
+                        one.subid = subid;
                         one.groupId = groupId;
-                        if (!Utils.IsNullOrEmpty(subid))
-                        {
-                            one.subid = subid;
-                        }
                         if (AddTypedServer(ref config, one, one.configType, false) == 0)
                         {
-                            countServers++;
+                            added++;
                         }
                     }
-                    if (countServers > 0)
+                    if (added > 0)
                     {
                         ToJsonFile(config);
-                        return countServers;
+                        return added;
                     }
                 }
             }
