@@ -411,7 +411,7 @@ namespace SingboxConfigCheck
                 (ECoreType.sing_box, 24), (ECoreType.hysteria2, 26),
                 (ECoreType.naiveproxy, 22), (ECoreType.tuic, 23), (ECoreType.hysteria, 21),
                 (ECoreType.clash_meta, 12), (ECoreType.Xray, 2), (ECoreType.v2fly, 1),
-                (ECoreType.v2fly_v5, 3), (ECoreType.v2rayN, 99),
+                (ECoreType.SagerNet, 3), (ECoreType.v2fly_v5, 4), (ECoreType.v2rayN, 99),
             })
             {
                 Check((int)ct == v, $"{ct} is still {v}");
