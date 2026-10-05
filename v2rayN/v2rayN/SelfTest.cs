@@ -77,45 +77,62 @@ namespace v2rayN
         public static int Run()
         {
             EnsureConsole();
-
-            // A report file is written unconditionally, first, so it exists even if
-            // something below throws.
-            var reportPath = Path.Combine(Utils.StartupPath(), "selftest-report.txt");
-            void Finish(int code)
-            {
-                try
-                {
-                    Directory.CreateDirectory(Path.GetDirectoryName(reportPath)!);
-                    File.WriteAllText(reportPath, _log.ToString(), new UTF8Encoding(false));
-                    Console.WriteLine();
-                    Console.WriteLine($"report written to {reportPath}");
-                }
-                catch { }
-                Environment.Exit(code);
-            }
-
             Say("v2rayN net48 self test");
-            Say(new string('=', 60));
 
-            Environment_();
-            SampleProfiles();
-            ShareLinkRoundTrips();
-            Validation_();
-            Generation();
-            Report();
+            try
+            {
+                Environment_();
+                SampleProfiles();
+                ShareLinkRoundTrips();
+                Validation_();
+                Generation();
+                Report();
+            }
+            catch (Exception ex)
+            {
+                // A self-test that cannot report its own crash is worse than none:
+                // the first CI run produced no output whatsoever for exactly this
+                // reason. Record it as a failure and still write the report.
+                _failures.Add($"the self test itself threw: {ex.GetType().Name}: {ex.Message}");
+                Say("");
+                Say($"!! the self test threw: {ex.GetType().Name}: {ex.Message}");
+                Say(ex.StackTrace ?? "(no stack trace)");
+            }
 
             Say(new string('=', 60));
             if (_failures.Count == 0)
             {
-                Console.WriteLine($"PASS  {_passed} checks, 0 failures");
+                Say($"PASS  {_passed} checks, 0 failures");
+                WriteReport();
                 return 0;
             }
-            Console.WriteLine($"FAIL  {_passed} passed, {_failures.Count} failed:");
+            Say($"FAIL  {_passed} passed, {_failures.Count} failed:");
             foreach (var f in _failures)
             {
-                Console.WriteLine($"  - {f}");
+                Say($"  - {f}");
             }
+            WriteReport();
             return 1;
+        }
+
+        /// <summary>
+        /// Always writes selftest-report.txt next to the exe, so a double-click that
+        /// flashes and exits still leaves a record, and so CI can read the report
+        /// rather than a WinExe's unreliable console stream.
+        /// </summary>
+        private static void WriteReport()
+        {
+            var path = Path.Combine(Utils.StartupPath(), "selftest-report.txt");
+            try
+            {
+                File.WriteAllText(path, _log.ToString(), new UTF8Encoding(false));
+                Say("");
+                Say($"report written to {path}");
+            }
+            catch (Exception ex)
+            {
+                Say($"could not write the report to {path}: {ex.Message}");
+            }
         }
 
         private static void Check(bool ok, string what)
