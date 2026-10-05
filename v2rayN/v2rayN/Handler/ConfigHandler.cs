@@ -964,6 +964,28 @@ namespace v2rayN.Handler
                         countServers++;
                     }
                 }
+                else if (vmessItem.configType == EConfigType.AnyTLS
+                      || vmessItem.configType == EConfigType.Naive)
+                {
+                    // This chain has no `else`, so a config type missing from it is
+                    // parsed and then silently dropped -- nothing is stored and the
+                    // caller sees 0, then falls through to the base64/SIP008/custom
+                    // parsers and reports -1. That is exactly what anytls:// and
+                    // naive+https:// did: ImportFromClipboardConfig returned a valid
+                    // item and it went nowhere. Both use the password-in-`id` layout
+                    // of the protocols above, so they take the same AddServer path.
+                    if (AddServer(ref config, vmessItem, false) == 0)
+                    {
+                        countServers++;
+                    }
+                }
+                else
+                {
+                    // Do not add a type silently again. Anything reaching here parsed
+                    // but had nowhere to go, which is indistinguishable from a bad
+                    // link to the user.
+                    Utils.SaveLog($"AddBatchServers: parsed but unhandled configType {vmessItem.configType}");
+                }
             }
 
             ToJsonFile(config);
