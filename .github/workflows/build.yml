@@ -793,22 +793,28 @@ jobs:
           [System.Security.Cryptography.HashAlgorithmName]::SHA256,
           [System.Security.Cryptography.RSASignaturePadding]::Pkcs1)
         $cert = $req.CreateSelfSigned([DateTimeOffset]::UtcNow.AddDays(-1), [DateTimeOffset]::UtcNow.AddDays(2))
-        $pfx = Join-Path $work 'cert.pfx'
-        [System.IO.File]::WriteAllBytes($pfx, $cert.Export([System.Security.Cryptography.X509Certificates.X509ContentType]::Pfx))
+        # PEM, not PFX: sing-box's TLS options take certificate_path / key_path and
+        # parse PEM, failing with 'failed to find any PEM data in certificate input'
+        # on a PKCS#12 file.
+        $certPem = Join-Path $work 'cert.pem'
+        $keyPem = Join-Path $work 'key.pem'
+        [System.IO.File]::WriteAllText($certPem, $cert.ExportCertificatePem())
+        [System.IO.File]::WriteAllText($keyPem, $rsa.ExportPkcs8PrivateKeyPem())
 
         # The AnyTLS server sing-box will run. Built as an object rather than a here-
         # string: a PowerShell @"..."@ terminator has to sit at column 0 and this whole
         # block is indented by the YAML, so it would never terminate.
         # users is a list of objects, not strings -- a string is rejected with a
         # struct-unmarshal error.
-        $pfxUnix = $pfx -replace '\\', '/'
+        $certUnix = $certPem -replace '\\', '/'
+        $keyUnix = $keyPem -replace '\\', '/'
         $serverObj = [ordered]@{
           log = [ordered]@{ level = 'warn' }
           inbounds = @(
             [ordered]@{
               type = 'anytls'; tag = 's'; listen = '127.0.0.1'; listen_port = $serverPort
               users = @([ordered]@{ name = 'u'; password = 'e2epw' })
-              tls = [ordered]@{ enabled = $true; certificate_path = $pfxUnix; key_path = $pfxUnix }
+              tls = [ordered]@{ enabled = $true; certificate_path = $certUnix; key_path = $keyUnix }
             }
           )
           outbounds = @([ordered]@{ type = 'direct'; tag = 'd' })
