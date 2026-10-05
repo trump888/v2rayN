@@ -1017,6 +1017,36 @@ namespace v2rayN.Handler
             }
 
             VmessItem vmessItem = new VmessItem();
+
+            // Is sing-box configuration. Checked before the v2ray branch: both use an
+            // "outbounds" array, but sing-box outbounds carry "type" where v2ray ones
+            // carry "protocol", so a sing-box config would otherwise be accepted here
+            // and stored as a v2ray custom config that xray cannot read.
+            if (SingboxConfigImporter.LooksLikeSingbox(clipboardData))
+            {
+                var imported = SingboxConfigImporter.Resolve(clipboardData);
+                if (imported.Count > 0)
+                {
+                    foreach (var one in imported)
+                    {
+                        one.groupId = groupId;
+                        if (!Utils.IsNullOrEmpty(subid))
+                        {
+                            one.subid = subid;
+                        }
+                        if (AddTypedServer(ref config, one, one.configType, false) == 0)
+                        {
+                            countServers++;
+                        }
+                    }
+                    if (countServers > 0)
+                    {
+                        ToJsonFile(config);
+                        return countServers;
+                    }
+                }
+            }
+
             //Is v2ray configuration
             V2rayConfig v2rayConfig = Utils.FromJson<V2rayConfig>(clipboardData);
             if (v2rayConfig != null

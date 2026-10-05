@@ -71,6 +71,10 @@ namespace SingboxConfigCheck
             CoreTable();
 
             Console.WriteLine();
+            Console.WriteLine("== sing-box config import round-trip ==");
+            SingboxImportRoundTrip(outDir);
+
+            Console.WriteLine();
             Console.WriteLine("== core policy and arguments ==");
             CorePolicy();
 
@@ -346,6 +350,98 @@ namespace SingboxConfigCheck
                 }
                 Check(json.Contains($"\"password\": \"{expectedPass.Replace("@", "@")}\""), $"naive ({label}) sets password '{expectedPass}'");
             }
+        }
+
+        /// <summary>
+        /// Generate a config with this build's own generator, then parse it back with
+        /// the sing-box importer and assert the profile survives. Round-tripping
+        /// through the real generator is the point: it proves the two halves agree on
+        /// field names, which is what a hand-written fixture would not.
+        /// </summary>
+        private static void SingboxImportRoundTrip(string outDir)
+        {
+            var cfg = new Config
+            {
+                inbound = new List<InItem>
+                {
+                    new InItem { protocol = Global.InboundSocks, localPort = 10808, udpEnabled = true, sniffingEnabled = true },
+                },
+            };
+            LazyConfig.Instance.SetConfig(ref cfg);
+
+            foreach (var (name, item, wantUser, wantPass) in new[]
+            {
+                ("anytls", new VmessItem { configType = EConfigType.AnyTLS, address = "a.example", port = 443,
+                    id = "pw", sni = "s.example", allowInsecure = "true",
+                    alpn = new List<string> { "h2" }, fingerprint = "chrome" }, null, "pw"),
+                ("naive", new VmessItem { configType = EConfigType.Naive, address = "n.example", port = 8443,
+                    id = "alice:s3cr@t", sni = "n.sni" }, "alice", "s3cr@t"),
+                ("masque", new VmessItem { configType = EConfigType.MASQUE, address = "q.example", port = 443,
+                    id = "bob:pw", sni = "q.sni", path = "/p" }, "bob", "pw"),
+            })
+            {
+                var file = Path.Combine(outDir, "rt-" + name + ".json");
+                var rc = V2rayConfigHandler.GenerateClientConfig(item, file, out var msg, out _);
+                Check(rc == 0 && File.Exists(file), $"{name}: generated for round-trip (msg: {msg})");
+                if (rc != 0 || !File.Exists(file)) { continue; }
+
+                var text = File.ReadAllText(file);
+                Check(SingboxConfigImporter.LooksLikeSingbox(text), $"{name}: its own output is recognised as sing-box");
+
+                var parsed = SingboxConfigImporter.Resolve(text);
+                Check(parsed.Count == 1, $"{name}: round-trip yields one profile (got {parsed.Count})");
+                if (parsed.Count != 1) { continue; }
+                var back = parsed[0];
+
+                Check(back.configType == item.configType, $"{name}: type survives ({back.configType})");
+                Check(back.address == item.address, $"{name}: address survives ('{back.address}')");
+                Check(back.port == item.port, $"{name}: port survives ({back.port})");
+                Check(back.sni == item.sni, $"{name}: sni survives ('{back.sni}')");
+                Check(back.allowInsecure == item.allowInsecure, $"{name}: insecure survives ('{back.allowInsecure}')");
+                Check((back.alpn ?? new List<string>()).SequenceEqual(item.alpn ?? new List<string>()),
+                      $"{name}: alpn survives ({string.Join(",", back.alpn ?? new List<string>())})");
+                Check(back.fingerprint == item.fingerprint, $"{name}: fingerprint survives ('{back.fingerprint}')");
+                Check(back.id == item.id, $"{name}: credential survives ('{back.id}')");
+                if (wantUser != null)
+                {
+                    Check(back.id == wantUser + ":" + wantPass, $"{name}: userinfo stays 'user:pass'");
+                }
+                if (item.configType == EConfigType.MASQUE)
+                {
+                    Check(back.path == item.path, $"masque: path survives ('{back.path}')");
+                }
+            }
+
+            // A pasted multi-outbound config must yield several profiles, and the
+            // helper outbounds must not become servers.
+            var multi = @"{
+              ""outbounds"": [
+                { ""type"": ""direct"", ""tag"": ""direct"" },
+                { ""type"": ""block"", ""tag"": ""block"" },
+                { ""type"": ""anytls"", ""tag"": ""one"", ""server"": ""x.example"", ""server_port"": 443,
+                  ""password"": ""p1"", ""tls"": { ""enabled"": true, ""server_name"": ""x.sni"" } },
+                { ""type"": ""trojan"", ""tag"": ""two"", ""server"": ""y.example"", ""server_port"": 8443,
+                  ""password"": ""p2"", ""tls"": { ""enabled"": true, ""server_name"": ""y.sni"" } }
+              ] }";
+            Check(SingboxConfigImporter.LooksLikeSingbox(multi), "a multi-outbound config is recognised");
+            var many = SingboxConfigImporter.Resolve(multi);
+            Check(many.Count == 2, $"only the two real proxies are imported (got {many.Count}: {string.Join(",", many.Select(x => x.configType))})");
+
+            // And a v2ray config must NOT be claimed by the sing-box importer --
+            // both use "outbounds", and confusing them would store a sing-box config
+            // as a v2ray custom config.
+            var v2rayish = @"{ ""inbounds"": [ { ""port"": 10808, ""protocol"": ""socks"" } ],
+                              ""outbounds"": [ { ""protocol"": ""freedom"" } ] }";
+            Check(!SingboxConfigImporter.LooksLikeSingbox(v2rayish), "a v2ray config is not claimed by the sing-box importer");
+            Check(SingboxConfigImporter.Resolve(v2rayish).Count == 0, "and resolves to nothing");
+
+            // End to end through the clipboard path the UI actually uses.
+            var cfg2 = new Config { vmess = new List<VmessItem>(), subItem = new List<SubItem>() };
+            var pasted = File.ReadAllText(Path.Combine(outDir, "rt-anytls.json"));
+            var n = ConfigHandler.AddBatchServers(ref cfg2, pasted, "", "g5");
+            Check(n == 1, $"pasting a generated sing-box config imports one server (got {n})");
+            Check(cfg2.vmess.FirstOrDefault()?.configType == EConfigType.AnyTLS,
+                  "and it is an AnyTLS profile, not a v2ray custom config");
         }
 
         /// <summary>
