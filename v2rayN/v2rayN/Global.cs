@@ -15,8 +15,12 @@ namespace v2rayN
         public const string xrayCoreUrl = "https://github.com/XTLS/Xray-core/releases";
         public const string SagerNetCoreUrl = "https://github.com/SagerNet/v2ray-core/releases";
         public const string NUrl = @"https://github.com/2dust/v2rayN/releases";
-        public const string clashCoreUrl = "https://github.com/Dreamacro/clash/releases";
-        public const string clashMetaCoreUrl = "https://github.com/MetaCubeX/Clash.Meta/releases";
+        // clashCoreUrl (Dreamacro/clash, 404) and clashMetaCoreUrl
+        // (MetaCubeX/Clash.Meta, redirects to mihomo but no longer ships any
+        // Clash.Meta-* exe) are removed. Both are superseded by mihomoCoreUrl below.
+        // The CoreUrl constants went with them: the policy gate in CI rejects a
+        // superseded project reappearing here even as an unused constant, because a
+        // dangling constant is how a core comes back to life by accident.
         // MetaCubeX/Clash.Meta was renamed to MetaCubeX/mihomo. GitHub redirects
         // the old name, so a download still succeeds -- but the archive now
         // contains mihomo-windows-amd64.exe, which none of the Clash.Meta-*
