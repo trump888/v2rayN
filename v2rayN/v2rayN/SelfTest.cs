@@ -153,6 +153,26 @@ namespace v2rayN
             }
         }
 
+        [DllImport("user32.dll")]
+        private static extern int GetDpiForSystem();
+
+        /// <summary>
+        /// The display's real DPI. Unlike GDI+'s Graphics.DpiX this does not depend
+        /// on the process's own awareness.
+        /// </summary>
+        private static int GetTrueSystemDpi()
+        {
+            try
+            {
+                var dpi = GetDpiForSystem();
+                return dpi > 0 ? dpi : 96;
+            }
+            catch
+            {
+                return 96;
+            }
+        }
+
         private static void Check(bool ok, string what)
         {
             if (ok)
@@ -188,15 +208,18 @@ namespace v2rayN
             // PerMonitorV2 comes from app.manifest. If the manifest were missing or
             // malformed the process would be DPI-unaware and the UI blurry on a
             // scaled display, which no headless CI check can see.
-            // Only the app.config half can be inspected from inside the running exe:
-            // app.manifest is *embedded* in v2rayN.exe and is never deployed beside
-            // it, so reading it here just throws. CI asserts the manifest half by
-            // grepping the built exe's bytes, which is where it actually lives.
+            // Report the truth, assert nothing. DPI awareness is intentionally OFF:
+            // declaring PerMonitorV2 without the matching WinForms scaling switch
+            // makes the UI render sharp and far too small on a scaled display, which
+            // was reported from a real 200% machine. See app.manifest.
+            //
+            // GetDpiForSystem is used because Graphics.DpiX reports 96 to a
+            // DPI-unaware process whatever the display really is, so it cannot tell a
+            // 100% display from a 200% one.
             var exeConfig = Path.Combine(Utils.StartupPath(), "v2rayN.exe.config");
             var configDpi = File.Exists(exeConfig) && File.ReadAllText(exeConfig).Contains("DpiAwareness");
-            Say($"  dpi app.config {(configDpi ? "DpiAwareness=PerMonitorV2" : "no DpiAwareness switch")}");
-            Check(configDpi,
-                  "v2rayN.exe.config carries the DpiAwareness switch (without it WinForms draws at 1/1.5 or 1/2 size)");
+            Say($"  true system dpi   {GetTrueSystemDpi()}");
+            Say($"  dpi awareness     {(configDpi ? "PerMonitorV2 (app.config)" : "DPI-unaware, Windows scales the window")}");
 
             try
             {
