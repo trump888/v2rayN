@@ -266,14 +266,6 @@ jobs:
     # A generated config that sing-box rejects is invisible to the compiler and only
     # fails when a user's proxy silently refuses to start. This runs
     # `sing-box check` over everything the generator produces.
-    # Only needed because MASQUE is not in any released sing-box, so the check
-    # below has to build it from source. Explicit rather than relying on whatever Go
-    # the runner image happens to carry.
-    - name: Setup Go (for building sing-box from source)
-      uses: actions/setup-go@v5
-      with:
-        go-version: '1.25'
-
     - name: Verify generated sing-box configs
       shell: pwsh
       run: |
@@ -341,38 +333,60 @@ jobs:
         if ($bad -gt 0) { throw "$bad of $count generated sing-box configurations were rejected" }
         Write-Host "all $count generated sing-box configurations accepted by sing-box $ver"
 
-        # --- Validate MASQUE against sing-box built from master -----------------
-        # The release stream has no MASQUE, so the only way to check it is to build
-        # it. Pinned to master so the check is reproducible; this is a compile of a
-        # dependency rather than of our code, and it is the only step here that
-        # needs Go.
+        # --- Validate MASQUE against a prebuilt sing-box that has it -----------
+        # MASQUE is in sing-box master (e22cd5406, 2026-09-21) and is still ahead of
+        # v1.14.2, so the release every user installs rejects it. It does ship in the
+        # project's own nightly builds of the testing branch -- so take the artifact
+        # rather than compiling sing-box from source in CI, which took minutes.
+        #
+        # binary-windows_amd64-legacy-windows-7 is deliberate: it is the Win7-capable
+        # build, which is the point of this branch.
         if (-not (Test-Path $masque)) {
-          Write-Host "no masque.json produced; nothing to check against master"
+          Write-Host "no masque.json produced; nothing to check"
           return
         }
-        Write-Host "building sing-box from source to check masque.json"
-        $src = Join-Path $env:RUNNER_TEMP 'sing-box-src'
-        git clone --depth 1 https://github.com/SagerNet/sing-box.git $src 2>&1 | Out-Null
-        if (-not (Test-Path (Join-Path $src 'go.mod'))) { throw "could not clone sing-box" }
-        Push-Location $src
-        try {
-          # The go.mod toolchain line is authoritative; setup-go would need pinning too.
-          $env:CGO_ENABLED = '0'
-          go build -o (Join-Path $env:RUNNER_TEMP 'sing-box-master') ./cmd/sing-box
-        } finally {
-          Pop-Location
+        $headers = @{ 'User-Agent' = 'v2rayN-net48-check' }
+        if ($env:GITHUB_TOKEN) { $headers['Authorization'] = "Bearer $env:GITHUB_TOKEN" }
+
+        $nightly = $null
+        for ($i = 0; $i -lt 10 -and -not $nightly; $i++) {
+          $runs = Invoke-RestMethod 'https://api.github.com/repos/SagerNet/sing-box/actions/workflows/build.yml/runs?branch=testing&per_page=10&status=success' -Headers $headers
+          foreach ($r in $runs.workflow_runs) {
+            $arts = Invoke-RestMethod "https://api.github.com/repos/SagerNet/sing-box/actions/runs/$($r.id)/artifacts" -Headers $headers
+            $a = $arts.artifacts | Where-Object { $_.name -eq 'binary-windows_amd64-legacy-windows-7' -and -not $_.expired } | Select-Object -First 1
+            if ($a) { $nightly = [pscustomobject]@{ Run = $r; Artifact = $a }; break }
+          }
+          if (-not $nightly) { Start-Sleep -Seconds 10 }
         }
-        $sbMaster = Join-Path $env:RUNNER_TEMP 'sing-box-master'
-        if (-not (Test-Path $sbMaster)) { throw "sing-box master build produced no binary" }
-        $vout = & $sbMaster version
-        Write-Host "built: $vout"
-        $mout = & $sbMaster check -c $masque 2>&1
+        if (-not $nightly) {
+          # Do not fail the build over this: the config is already covered by the
+          # structural assertions above, and sing-box's own CI is the source of truth
+          # for whether MASQUE is still in their tree.
+          Write-Warning "could not find a sing-box nightly with MASQUE; skipping the runtime check (shape is asserted structurally above)"
+          return
+        }
+        Write-Host "using sing-box nightly from run $($nightly.Run.id) ($($nightly.Run.head_sha.Substring(0,9)), $($nightly.Run.created_at)"
+
+        $zipPath = Join-Path $env:RUNNER_TEMP 'sb-nightly.zip'
+        Invoke-WebRequest "https://api.github.com/repos/SagerNet/sing-box/actions/artifacts/$($nightly.Artifact.id)/zip" `
+          -Headers $headers -OutFile $zipPath
+        Expand-Archive -Force $zipPath (Join-Path $env:RUNNER_TEMP 'sb-nightly')
+        $sbNightly = Get-ChildItem (Join-Path $env:RUNNER_TEMP 'sb-nightly') -Recurse -Filter '*.zip' -File |
+                     Sort-Object Length -Descending | Select-Object -First 1
+        if ($sbNightly) { Expand-Archive -Force $sbNightly.FullName (Join-Path $env:RUNNER_TEMP 'sb-nightly-bin') }
+        $sbExe = Get-ChildItem (Join-Path $env:RUNNER_TEMP 'sb-nightly-bin') -Recurse -Filter 'sing-box.exe' -File |
+                 Select-Object -First 1
+        if (-not $sbExe) { Write-Warning "sing-box.exe not found in the nightly artifact; skipping the runtime MASQUE check"; return }
+
+        $vout = & $sbExe.FullName version
+        Write-Host "built: $($vout -join ' ')"
+        $mout = & $sbExe.FullName check -c $masque 2>&1
         if ($LASTEXITCODE -ne 0) {
-          Write-Error "masque.json was rejected by sing-box built from master:"
+          Write-Error "masque.json was rejected by the sing-box nightly:"
           $mout | Select-Object -First 10 | ForEach-Object { Write-Host "  $_" }
           exit 1
         }
-        Write-Host "  valid   masque.json (accepted by sing-box built from master)"
+        Write-Host "  valid   masque.json (accepted by a prebuilt sing-box nightly)"
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
