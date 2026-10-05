@@ -81,6 +81,24 @@ namespace v2rayN
 
             try
             {
+                // Config generation reads the local inbound port out of LazyConfig.
+                // Without this the config has no listener, and all ten generations
+                // fail -- which is exactly what the first run did.
+                var cfg = new Config
+                {
+                    inbound = new List<InItem>
+                    {
+                        new InItem
+                        {
+                            protocol = Global.InboundSocks,
+                            localPort = 20880,
+                            udpEnabled = true,
+                            sniffingEnabled = true,
+                        },
+                    },
+                };
+                LazyConfig.Instance.SetConfig(ref cfg);
+
                 Environment_();
                 SampleProfiles();
                 ShareLinkRoundTrips();

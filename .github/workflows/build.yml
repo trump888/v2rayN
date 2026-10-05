@@ -329,6 +329,37 @@ jobs:
     # redirects MetaCubeX/Clash.Meta to MetaCubeX/mihomo) while its
     # "Clash.Meta-*" exe names stopped matching "mihomo-windows-amd64.exe", so
     # the binary was never found. Both compile, both run, both fail on click.
+    # The manifest must be embedded, not merely present in the folder. 5.39 had the
+    # file absent and the csproj property absent, so the exe was DPI-unaware and
+    # Environment.OSVersion reported 6.2 on every machine -- which is what made
+    # GetCheckUpdateCoreTypes hide Xray, mihomo and sing-box from the update list.
+    - name: Verify the app manifest is embedded
+      shell: pwsh
+      run: |
+        $csproj = Get-Content 'v2rayN/v2rayN/v2rayN.csproj' -Raw
+        if ($csproj -notmatch '<ApplicationManifest>\s*app\.manifest\s*</ApplicationManifest>') {
+          Write-Error "v2rayN.csproj does not declare <ApplicationManifest>app.manifest</ApplicationManifest>; the exe would be DPI-unaware and Environment.OSVersion would report 6.2 everywhere"
+          exit 1
+        }
+        $mf = Get-Content 'v2rayN/v2rayN/app.manifest' -Raw
+        foreach ($guid in @(
+          '8e0f7a12-bfb3-4fe8-b9a5-48fd50a15a9a',   # Windows 10/11
+          '35138b9a-5d96-4fbd-8e2d-a2440225f93a')) { # Windows 7
+          if ($mf -notmatch $guid) { Write-Error "app.manifest is missing supportedOS $guid"; exit 1 }
+        }
+        if ($mf -notmatch 'PerMonitorV2') { Write-Error "app.manifest does not request PerMonitorV2 DPI awareness"; exit 1 }
+
+        # And confirm it reached the binary, not just the project file.
+        $exe = Get-ChildItem 'v2rayN/v2rayN/bin/Release' -Recurse -Filter 'v2rayN.exe' -File | Select-Object -First 1
+        if (-not $exe) { throw "v2rayN.exe not built" }
+        $bytes = [System.IO.File]::ReadAllBytes($exe.FullName)
+        $text = [System.Text.Encoding]::ASCII.GetString($bytes)
+        foreach ($needle in @('PerMonitorV2', '8e0f7a12-bfb3-4fe8-b9a5-48fd50a15a9a')) {
+          $found = $text.Contains($needle)
+          Write-Host ("  {0,-40} embedded in v2rayN.exe: {1}" -f $needle, $found)
+          if (-not $found) { Write-Error "$needle is not in the built exe; the manifest was not applied"; exit 1 }
+        }
+
     # Run the shipped app's own --selftest. This is the same entry point a user runs
     # on their machine, so it is the one piece of verification that is not a
     # reimplementation of it in a test project.

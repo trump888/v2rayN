@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<assembly manifestVersion="1.0" xmlns="urn:schemas-microsoft-com:asm.v1">
+  <assemblyIdentity version="1.0.0.0" name="v2rayN.app" />
+
+  <!--
+    PerMonitorV2, so the window is sharp on a scaled display rather than bitmap
+    stretched by Windows. `true/pm` covers Windows 8.1+; the 2016-namespace
+    dpiAwareness refines it to PerMonitorV2 on Windows 10+. Windows 7 ignores
+    both, which is correct.
+
+    Without this the process is DPI-unaware and the whole UI is blurry on any
+    display that is not at 100%.
+  -->
+  <application xmlns="urn:schemas-microsoft-com:asm.v3">
+    <windowsSettings>
+      <dpiAware xmlns="http://schemas.microsoft.com/SMI/2005/WindowsSettings">true/pm</dpiAware>
+      <dpiAwareness xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">PerMonitorV2, PerMonitor</dpiAwareness>
+    </windowsSettings>
+  </application>
+
+  <!--
+    supportedOS. Without a declaration, .NET Framework's Environment.OSVersion
+    returns 6.2 (Windows 8) on every machine, whatever is really running.
+
+    That is not cosmetic here: CoreInfoManager.GetCheckUpdateCoreTypes() reads
+
+        if (!(Utils.IsWindows() && Environment.OSVersion.Version.Major < 10))
+
+    so with a hardcoded 6.2 the test is false everywhere and Xray, mihomo and
+    sing-box are dropped from the update list on every version of Windows.
+
+    Declaring Windows 10 also stops Windows 10/11 lying to us. Per Microsoft it
+    has no effect when the app runs on an earlier OS, so listing Windows 7
+    alongside it does not cost Windows 7 its own compatibility behaviour.
+  -->
+  <compatibility xmlns="urn:schemas-microsoft-com:compatibility.v1">
+    <application>
+      <supportedOS Id="{8e0f7a12-bfb3-4fe8-b9a5-48fd50a15a9a}" />
+      <supportedOS Id="{1f676c76-80e1-4239-95bb-83d0f6d0da78}" />
+      <supportedOS Id="{4a2f28e3-53b9-4441-ba9c-d69d4a4a6e38}" />
+      <supportedOS Id="{35138b9a-5d96-4fbd-8e2d-a2440225f93a}" />
+    </application>
+  </compatibility>
+</assembly>

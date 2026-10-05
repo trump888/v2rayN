@@ -10,6 +10,12 @@
     </AssemblyAttribute>
   </ItemGroup>
   <PropertyGroup>
+    <!-- 5.39 had no app.manifest at all, so this exe was DPI-unaware (blurry on
+         any scaled display) and Environment.OSVersion reported 6.2 on every
+         machine -- which made GetCheckUpdateCoreTypes() hide Xray, mihomo and
+         sing-box from the update list everywhere. CI asserts the manifest is
+         embedded so this cannot silently regress. -->
+    <ApplicationManifest>app.manifest</ApplicationManifest>
     <TargetFramework>net48</TargetFramework>
     <LangVersion>preview</LangVersion>
     <OutputType>WinExe</OutputType>
