@@ -659,16 +659,21 @@ jobs:
           # Capture sing-box's own output. Without this a failure is just "exited with
           # code 1" and the reason is invisible -- which is exactly how the naive
           # username problem was hard to pin down.
-          $runLog = Join-Path $env:RUNNER_TEMP ("run-" + $f.Name + ".log")
+          # Start-Process refuses to point both streams at one file, so they go to
+          # separate paths and both are printed on failure.
+          $runOut = Join-Path $env:RUNNER_TEMP ("run-" + $f.Name + ".out.log")
+          $runErr = Join-Path $env:RUNNER_TEMP ("run-" + $f.Name + ".err.log")
           $proc = Start-Process -FilePath $useExe -ArgumentList @('run', '-c', $runCfg) -PassThru -WindowStyle Hidden `
-                  -RedirectStandardOutput $runLog -RedirectStandardError $runLog
+                  -RedirectStandardOutput $runOut -RedirectStandardError $runErr
           $ok = $false
           try {
             Start-Sleep -Seconds 3
             if ($proc.HasExited) {
               Write-Host "  FAILED  $($f.Name): sing-box exited with code $($proc.ExitCode)"
-              if (Test-Path $runLog) {
-                Get-Content $runLog -TotalCount 12 | ForEach-Object { Write-Host "      $_" }
+              foreach ($lf in @($runOut, $runErr)) {
+                if (Test-Path $lf) {
+                  Get-Content $lf -TotalCount 8 | ForEach-Object { Write-Host "      $_" }
+                }
               }
             } else {
               $client = [System.Net.Sockets.TcpClient]::new()
@@ -684,6 +689,7 @@ jobs:
             # Wait for it to actually go, so the port is free before the next run.
             [void]$proc.WaitForExit(10000)
             Remove-Item $runCfg -Force -ErrorAction SilentlyContinue
+            Remove-Item $runOut, $runErr -Force -ErrorAction SilentlyContinue
           }
           if (-not $ok) { $runFailures++ }
         }
