@@ -384,8 +384,12 @@ namespace SingboxConfigCheck
                 [ECoreType.overtls]     = ("overtls-bin", "overtls-x86_64-win7-windows-msvc.zip"),
                 [ECoreType.shadowquic]  = ("shadowquic", "shadowquic-x86_64-windows.exe"),
             };
-            foreach (var (ct, (exe, asset)) in expected)
+            foreach (var kvp in expected)
             {
+                var ct = kvp.Key;
+                var exe = kvp.Value.Exe;
+                var asset = kvp.Value.Asset;
+
                 var info = lazy.GetCoreInfo(ct);
                 Check(info != null, $"{ct} is registered");
                 if (info == null) { continue; }
@@ -402,7 +406,7 @@ namespace SingboxConfigCheck
             // Enum values are persisted in saved profiles and must not move.
             foreach (var (ct, v) in new[]
             {
-                (ECoreType.Mieru, 30), (ECoreType.juicity, 25), (ECoreType.brook, 27),
+                (ECoreType.juicity, 25), (ECoreType.brook, 27),
                 (ECoreType.overtls, 28), (ECoreType.shadowquic, 29),
                 (ECoreType.sing_box, 24), (ECoreType.hysteria2, 26),
                 (ECoreType.naiveproxy, 22), (ECoreType.tuic, 23), (ECoreType.hysteria, 21),
@@ -572,6 +576,8 @@ namespace SingboxConfigCheck
             Check((int)EConfigType.Mieru == 11, "Mieru is still 11 (saved profiles depend on it)");
             Check((int)EConfigType.AnyTLS == 12, "AnyTLS is 12");
             Check((int)EConfigType.Naive == 13, "Naive is 13");
+            Check((int)EConfigType.MASQUE == 14, "MASQUE is 14");
+            Check((int)EConfigType.Mieru == 11, "Mieru is 11 (5.39 predates 7.x reusing that value for Anytls)");
         }
     }
 }
