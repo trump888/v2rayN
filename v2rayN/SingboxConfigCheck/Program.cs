@@ -46,6 +46,19 @@ namespace SingboxConfigCheck
 
         private static int Main(string[] args)
         {
+            // --e2e <outDir> <serverPort> <password>
+            //
+            // Emits one AnyTLS client configuration aimed at a sing-box AnyTLS
+            // *server* the workflow starts locally, so the end-to-end test proxies a
+            // real request through a config this build's own generator produced
+            // rather than a hand-written fixture.
+            if (args.Length > 0 && args[0] == "--e2e")
+            {
+                return GenerateE2E(args.Length > 1 ? args[1] : ".",
+                                  args.Length > 2 ? int.Parse(args[2]) : 24443,
+                                  args.Length > 3 ? args[3] : "e2epw");
+            }
+
             var outDir = args.Length > 0 ? args[0] : ".";
             Directory.CreateDirectory(outDir);
 
@@ -355,6 +368,42 @@ namespace SingboxConfigCheck
                 }
                 Check(json.Contains($"\"password\": \"{expectedPass.Replace("@", "@")}\""), $"naive ({label}) sets password '{expectedPass}'");
             }
+        }
+
+        /// <summary>
+        /// Generate one AnyTLS client configuration pointing at a local sing-box
+        /// AnyTLS server, for the end-to-end relay test.
+        /// </summary>
+        private static int GenerateE2E(string outDir, int serverPort, string password)
+        {
+            Directory.CreateDirectory(outDir);
+            var item = new VmessItem
+            {
+                configType = EConfigType.AnyTLS,
+                address = "127.0.0.1",
+                port = serverPort,
+                id = password,
+                sni = "localhost",
+                // The workflow's server uses a throwaway self-signed certificate, so
+                // verification has to be off or the handshake fails.
+                allowInsecure = "true",
+            };
+
+            var cfg = new Config
+            {
+                inbound = new List<InItem>
+                {
+                    new InItem { protocol = Global.InboundSocks, localPort = 20888, udpEnabled = true, sniffingEnabled = true },
+                },
+            };
+            LazyConfig.Instance.SetConfig(ref cfg);
+
+            var file = Path.Combine(outDir, "e2e-anytls-client.json");
+            var rc = V2rayConfigHandler.GenerateClientConfig(item, file, out var msg, out _);
+            Console.WriteLine(rc == 0
+                ? $"generated {file} (rc={rc}, msg={msg})"
+                : $"generation failed: rc={rc} msg={msg}");
+            return rc == 0 ? 0 : 1;
         }
 
         /// <summary>

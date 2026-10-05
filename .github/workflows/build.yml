@@ -765,6 +765,118 @@ jobs:
         }
         if ($runFailures -gt 0) { throw "$runFailures runtime checks failed" }
 
+    # The end-to-end test: a real HTTP request, through a real AnyTLS tunnel, using
+    # a client configuration this build's own generator produced.
+    #
+    # Everything above proves the configs load, start and bind. None of it proves
+    # they carry traffic. This does: curl-equivalent -> mixed inbound -> generated
+    # anytls outbound -> a sing-box anytls *server* started here -> direct -> a local
+    # origin, and the payload has to come back byte for byte.
+    - name: End-to-end proxy relay
+      shell: pwsh
+      run: |
+        $ErrorActionPreference = 'Stop'
+        $sb = 'artifacts/singbox/sing-box.exe'
+        if (-not (Test-Path $sb)) { throw "$sb not found" }
+
+        $work = Join-Path $env:RUNNER_TEMP 'e2e'
+        New-Item -ItemType Directory -Force -Path $work | Out-Null
+        $serverPort = 24443
+        $originPort = 28080
+        $payload = 'hello-through-anytls'
+
+        # Throwaway self-signed certificate, made with .NET so the step needs no
+        # openssl. CN must match the server_name the client config uses.
+        $rsa = [System.Security.Cryptography.RSA]::Create(2048)
+        $req = [System.Security.Cryptography.X509Certificates.CertificateRequest]::new(
+          'CN=localhost', $rsa,
+          [System.Security.Cryptography.HashAlgorithmName]::SHA256,
+          [System.Security.Cryptography.RSASignaturePadding]::Pkcs1)
+        $cert = $req.CreateSelfSigned([DateTimeOffset]::UtcNow.AddDays(-1), [DateTimeOffset]::UtcNow.AddDays(2))
+        $pfx = Join-Path $work 'cert.pfx'
+        [System.IO.File]::WriteAllBytes($pfx, $cert.Export([System.Security.Cryptography.X509Certificates.X509ContentType]::Pfx))
+
+        # The AnyTLS server sing-box will run. Built as an object rather than a here-
+        # string: a PowerShell @"..."@ terminator has to sit at column 0 and this whole
+        # block is indented by the YAML, so it would never terminate.
+        # users is a list of objects, not strings -- a string is rejected with a
+        # struct-unmarshal error.
+        $pfxUnix = $pfx -replace '\\', '/'
+        $serverObj = [ordered]@{
+          log = [ordered]@{ level = 'warn' }
+          inbounds = @(
+            [ordered]@{
+              type = 'anytls'; tag = 's'; listen = '127.0.0.1'; listen_port = $serverPort
+              users = @([ordered]@{ name = 'u'; password = 'e2epw' })
+              tls = [ordered]@{ enabled = $true; certificate_path = $pfxUnix; key_path = $pfxUnix }
+            }
+          )
+          outbounds = @([ordered]@{ type = 'direct'; tag = 'd' })
+        }
+        $serverCfg = $serverObj | ConvertTo-Json -Depth 10
+        $serverCfgPath = Join-Path $work 'server.json'
+        Set-Content -Path $serverCfgPath -Value $serverCfg -Encoding utf8
+
+        # The CLIENT config comes from this build's generator, not from here.
+        $gen = Join-Path $work 'gen'
+        nuget restore v2rayN/SingboxConfigCheck/SingboxConfigCheck.csproj | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw 'checker restore failed' }
+        msbuild v2rayN/SingboxConfigCheck/SingboxConfigCheck.csproj /p:Configuration=Release /p:Platform="Any CPU" /v:minimal /nologo
+        if ($LASTEXITCODE -ne 0) { throw 'checker build failed' }
+        $checker = Get-ChildItem v2rayN/SingboxConfigCheck/bin -Recurse -Filter 'SingboxConfigCheck.exe' -File | Select-Object -First 1
+        & $checker.FullName --e2e $gen $serverPort 'e2epw'
+        if ($LASTEXITCODE -ne 0) { throw 'e2e config generation failed' }
+        $clientCfg = Join-Path $gen 'e2e-anytls-client.json'
+        if (-not (Test-Path $clientCfg)) { throw 'e2e client config was not produced' }
+
+        # A local origin to fetch, so the relay has somewhere real to go.
+        $origin = Start-Job -ScriptBlock {
+          param($port, $body)
+          $l = [System.Net.HttpListener]::new()
+          $l.Prefixes.Add("http://127.0.0.1:$port/")
+          $l.Start()
+          while ($l.IsListening) {
+            try {
+              $ctx = $l.GetContext()
+              $bytes = [System.Text.Encoding]::UTF8.GetBytes($body)
+              $ctx.Response.ContentLength64 = $bytes.Length
+              $ctx.Response.OutputStream.Write($bytes, 0, $bytes.Length)
+              $ctx.Response.Close()
+            } catch { break }
+          }
+        } -ArgumentList $originPort, $payload
+
+        $server = Start-Process -FilePath $sb -ArgumentList @('run', '-c', $serverCfgPath) -PassThru -WindowStyle Hidden `
+                  -RedirectStandardOutput (Join-Path $work 'srv.out') -RedirectStandardError (Join-Path $work 'srv.err')
+        $client = $null
+        try {
+          Start-Sleep -Seconds 3
+          if ($server.HasExited) {
+            Get-Content (Join-Path $work 'srv.err') -TotalCount 10 | ForEach-Object { Write-Host "      $_" }
+            throw 'anytls server exited'
+          }
+          $client = Start-Process -FilePath $sb -ArgumentList @('run', '-c', $clientCfg) -PassThru -WindowStyle Hidden `
+                     -RedirectStandardOutput (Join-Path $work 'cli.out') -RedirectStandardError (Join-Path $work 'cli.err')
+          Start-Sleep -Seconds 3
+          if ($client.HasExited) {
+            Get-Content (Join-Path $work 'cli.err') -TotalCount 10 | ForEach-Object { Write-Host "      $_" }
+            throw 'anytls client (generated config) exited'
+          }
+
+          # The request. Invoke-WebRequest with -Proxy goes through the mixed inbound,
+          # which means the AnyTLS tunnel has to work for this to return anything.
+          $resp = Invoke-WebRequest -Uri "http://127.0.0.1:$originPort/" -Proxy 'http://127.0.0.1:20888' -TimeoutSec 20 -UseBasicParsing
+          if ($resp.Content -ne $payload) {
+            throw "relayed body was '$($resp.Content)', expected '$payload'"
+          }
+          Write-Host "  relayed  '$($resp.Content)' through mixed inbound -> anytls -> server -> origin"
+        } finally {
+          if ($client -and -not $client.HasExited) { $client.Kill(); [void]$client.WaitForExit(10000) }
+          if (-not $server.HasExited) { $server.Kill(); [void]$server.WaitForExit(10000) }
+          Stop-Job $origin -ErrorAction SilentlyContinue
+          Remove-Job $origin -Force -ErrorAction SilentlyContinue
+        }
+
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
