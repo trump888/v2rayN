@@ -203,11 +203,12 @@ namespace SingboxConfigCheck
         /// </summary>
         private static void WireGuard(string outDir)
         {
-            var priv = Convert.ToBase64String(Enumerable.Repeat((byte)0x11, 32).ToArray());
-            var pub = Convert.ToBase64String(Enumerable.Repeat((byte)0x22, 32).ToArray());
+            var privKey = Convert.ToBase64String(Enumerable.Repeat((byte)0x11, 32).ToArray());
+            var pubKey = Convert.ToBase64String(Enumerable.Repeat((byte)0x22, 32).ToArray());
+            var pskKey = Convert.ToBase64String(Enumerable.Repeat((byte)0x33, 32).ToArray());
 
-            const string link = "wireguard://" + "cHJpdg%3D%3D@wg.example.com:51820" +
-                "?publickey=cHVi&presharedkey=cHNr&address=172.16.0.2%2F32" +
+            const string link = "wireguard://" + "ERERERERERERERERERERERERERERERERERERERERERE%3D@wg.example.com:51820" +
+                "?publickey=IiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiI%3D&presharedkey=MzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzM%3D&address=172.16.0.2%2F32" +
                 "&reserved=1%2C2%2C3&mtu=1408&dns=1.1.1.1#WG";
 
             var item = ShareHandler.ImportFromClipboardConfig(link, out var msg);
@@ -215,9 +216,13 @@ namespace SingboxConfigCheck
             if (item == null) { return; }
             Check(item.configType == EConfigType.WireGuard, "imported type is WireGuard");
             Check(item.address == "wg.example.com" && item.port == 51820, "peer address and port");
-            Check(item.id == "cHJpdg==", $"private key decodes (got '{item.id}')");
-            Check(item.publicKey == "cHVi", "public key");
-            Check(item.preSharedKey == "cHNr", "pre-shared key");
+            // Real 32-byte keys. A short key such as "cHJpdg==" passes
+            // `sing-box check` -- which never constructs the peer -- and then fails at
+            // startup with "decode public key for peer 0". Same lesson as the
+            // naive/cronet case: check does not build what run has to build.
+            Check(item.id == privKey, $"private key decodes (got '{item.id}')");
+            Check(item.publicKey == pubKey, "public key");
+            Check(item.preSharedKey == pskKey, "pre-shared key");
             Check(item.interfaceAddress == "172.16.0.2/32", $"interface address (got '{item.interfaceAddress}')");
             Check(item.reserved == "1,2,3", $"reserved (got '{item.reserved}')");
             Check(item.mtu == 1408, $"mtu (got {item.mtu})");
@@ -244,7 +249,7 @@ namespace SingboxConfigCheck
 
             var json = File.ReadAllText(file);
             Check(json.Contains("\"type\": \"wireguard\""), "endpoint is a wireguard endpoint");
-            Check(json.Contains("\"private_key\": \"cHJpdg==\""), "private key emitted");
+            Check(json.Contains($"\"private_key\": \"{privKey}\""), "private key emitted");
             Check(json.Contains("\"address\": \"wg.example.com\""), "peer address uses \"address\", not \"server\"");
             Check(json.Contains("\"allowed_ips\""), "allowed_ips present (sing-box refuses to start without it)");
             Check(json.Contains("\"0.0.0.0/0\""), "allowed_ips defaults to both families");
