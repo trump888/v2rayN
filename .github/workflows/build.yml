@@ -642,11 +642,21 @@ jobs:
         }
 
         $runFailures = 0
+        $port = 21000
         foreach ($f in $sbAll) {
           $useExe = if ($f.Name -match 'masque') { $nightly } else { $exe }
+
+          # Give every run its own port. All the generated configs listen on the same
+          # one, and Kill() does not wait for the socket to be released, so the second
+          # config could fail to bind and sing-box would exit -- which looks exactly
+          # like a bad config. Sequential runs on a shared port were the cause.
+          $port++
           $cfg = Get-Content $f.FullName -Raw | ConvertFrom-Json
-          $port = [int]$cfg.inbounds[0].listen_port
-          $proc = Start-Process -FilePath $useExe -ArgumentList @('run', '-c', $f.FullName) -PassThru -WindowStyle Hidden
+          $cfg.inbounds[0].listen_port = $port
+          $runCfg = Join-Path $env:RUNNER_TEMP ("run-" + $f.Name)
+          $cfg | ConvertTo-Json -Depth 20 | Set-Content -Path $runCfg -Encoding utf8
+
+          $proc = Start-Process -FilePath $useExe -ArgumentList @('run', '-c', $runCfg) -PassThru -WindowStyle Hidden
           $ok = $false
           try {
             Start-Sleep -Seconds 3
@@ -663,6 +673,9 @@ jobs:
             }
           } finally {
             if (-not $proc.HasExited) { $proc.Kill() }
+            # Wait for it to actually go, so the port is free before the next run.
+            [void]$proc.WaitForExit(10000)
+            Remove-Item $runCfg -Force -ErrorAction SilentlyContinue
           }
           if (-not $ok) { $runFailures++ }
         }
