@@ -38,7 +38,8 @@ namespace v2rayN.Forms
             // controls on panVmess. It only differs in which ones it adds.
             if (eConfigType == EConfigType.Hysteria2 || eConfigType == EConfigType.Mieru
                 || eConfigType == EConfigType.TUIC || eConfigType == EConfigType.AnyTLS
-                || eConfigType == EConfigType.Naive)
+                || eConfigType == EConfigType.Naive
+                || eConfigType == EConfigType.MASQUE)
             {
                 int yPos = 120;
 
@@ -105,7 +106,8 @@ namespace v2rayN.Forms
                     panVmess.Controls.Add(txtObfsPassword);
                 }
 
-                if (eConfigType == EConfigType.AnyTLS || eConfigType == EConfigType.Naive)
+                if (eConfigType == EConfigType.AnyTLS || eConfigType == EConfigType.Naive
+                    || eConfigType == EConfigType.MASQUE)
                 {
                     // Only the three fields the sing-box generator and the
                     // anytls:// share link actually use. The shared sni /
@@ -216,6 +218,7 @@ namespace v2rayN.Forms
                 case EConfigType.TUIC:
                 case EConfigType.AnyTLS:
                 case EConfigType.Naive:
+                case EConfigType.MASQUE:
                     panVmess.Dock = DockStyle.Fill;
                     panVmess.Visible = true;
                     break;
@@ -270,6 +273,7 @@ namespace v2rayN.Forms
                     break;
                 case EConfigType.AnyTLS:
                 case EConfigType.Naive:
+                case EConfigType.MASQUE:
                     txtId.Text = vmessItem.id;
                     if (txtSni != null) txtSni.Text = vmessItem.sni ?? "";
                     if (cmbFingerprint != null) cmbFingerprint.Text = vmessItem.fingerprint ?? "";
@@ -370,6 +374,7 @@ namespace v2rayN.Forms
                 case EConfigType.TUIC:
                 case EConfigType.AnyTLS:
                 case EConfigType.Naive:
+                case EConfigType.MASQUE:
                     id = txtId.Text;
                     break;
             }
@@ -437,7 +442,8 @@ namespace v2rayN.Forms
                 if (txtCertSha256 != null)
                     vmessItem.certSha256 = txtCertSha256.Text;
             }
-            if (eConfigType == EConfigType.AnyTLS || eConfigType == EConfigType.Naive)
+            if (eConfigType == EConfigType.AnyTLS || eConfigType == EConfigType.Naive
+                || eConfigType == EConfigType.MASQUE)
             {
                 if (txtSni != null) vmessItem.sni = txtSni.Text;
                 if (cmbFingerprint != null) vmessItem.fingerprint = cmbFingerprint.Text;

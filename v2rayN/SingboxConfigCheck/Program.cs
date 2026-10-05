@@ -54,6 +54,10 @@ namespace SingboxConfigCheck
             NaiveRoundTrip(outDir);
 
             Console.WriteLine();
+            Console.WriteLine("== masque ==");
+            Masque(outDir);
+
+            Console.WriteLine();
             Console.WriteLine("== full UI clipboard path ==");
             ClipboardPath(outDir);
 
@@ -165,6 +169,68 @@ namespace SingboxConfigCheck
         }
 
         /// <summary>
+        /// MASQUE. sing-box models it as an <c>endpoints</c> entry typed
+        /// "masque-client", not an outbound, so the generated config has to be shaped
+        /// differently from AnyTLS and Naive: a direct outbound, a route rule sending
+        /// QUIC at the endpoint, and the endpoint itself.
+        ///
+        /// Structural assertions only. MASQUE is in sing-box *master*
+        /// (e22cd5406, 2026-09-21) and still 45 commits ahead of v1.14.2, so no
+        /// released binary accepts it. `sing-box check` cannot be run against the
+        /// release the app ships; see the build-from-master workflow step.
+        /// </summary>
+        private static void Masque(string outDir)
+        {
+            var item = ShareHandler.ImportFromClipboardConfig(
+                "masque://alice:s3cr%40t@example.com:443?path=%2Fcustom%2Fpath&sni=cdn.example.org&insecure=1#MQ",
+                out var msg);
+            Check(item != null, $"masque:// imports (msg: {msg})");
+            if (item == null) { return; }
+
+            Check(item.configType == EConfigType.MASQUE, "imported type is MASQUE");
+            Check(item.address == "example.com" && item.port == 443, "address and port");
+            Check(item.id == "alice:s3cr@t", $"credential decodes (got '{item.id}')");
+            Check(item.path == "/custom/path", $"path decodes (got '{item.path}')");
+            Check(item.sni == "cdn.example.org", "sni");
+            Check(item.allowInsecure == "1", "insecure");
+
+            var again = ShareHandler.ImportFromClipboardConfig(ShareHandler.GetShareUrl(item), out _);
+            Check(again != null && again.id == item.id && again.path == item.path
+                  && again.address == item.address && again.port == item.port
+                  && again.sni == item.sni && again.remarks == item.remarks,
+                  "masque survives an export/import cycle unchanged");
+
+            var cfg = new Config
+            {
+                inbound = new List<InItem>
+                {
+                    new InItem { protocol = Global.InboundSocks, localPort = 10808, udpEnabled = true, sniffingEnabled = true },
+                },
+            };
+            LazyConfig.Instance.SetConfig(ref cfg);
+
+            var file = Path.Combine(outDir, "masque.json");
+            var rc = V2rayConfigHandler.GenerateClientConfig(item, file, out var genMsg, out _);
+            Check(rc == 0, $"MASQUE generates (msg: {genMsg})");
+            if (rc != 0 || !File.Exists(file)) { return; }
+
+            var json = File.ReadAllText(file);
+            Check(json.Contains("\"endpoints\""), "config has a top-level endpoints array");
+            Check(json.Contains("\"type\": \"masque-client\""), "endpoint is typed masque-client");
+            Check(json.Contains("\"tag\": \"proxy-endpoint\""), "endpoint is tagged proxy-endpoint");
+            Check(json.Contains("\"username\": \"alice\""), "endpoint username is split out of the userinfo");
+            Check(json.Contains("\"password\": \"s3cr@t\""), "endpoint password is the part after the colon");
+            Check(json.Contains("\"path\": \"/custom/path\""), "endpoint carries the path");
+            Check(json.Contains("\"network\": \"quic\""), "a route rule sends QUIC at the endpoint");
+            Check(json.Contains("\"listen_port\": 10808"), "mixed inbound uses the configured local port");
+            Check(!json.Contains("\"type\": \"masque\""), "not emitted as an outbound (sing-box has no masque outbound)");
+
+            Check(SingboxConfigHandler.IsEndpointType(EConfigType.MASQUE), "MASQUE is classified as an endpoint type");
+            Check(!SingboxConfigHandler.IsEndpointType(EConfigType.AnyTLS), "AnyTLS is not an endpoint type");
+            Check((int)EConfigType.MASQUE == 14, "MASQUE is 14");
+        }
+
+        /// <summary>
         /// The path the UI actually takes. MainForm reads the clipboard and calls
         /// ConfigHandler.AddBatchServers, which splits on newlines, routes
         /// subscription-looking data, calls ShareHandler, and falls back through
@@ -184,7 +250,8 @@ namespace SingboxConfigCheck
                 var n = ConfigHandler.AddBatchServers(ref config, link, "", "group1");
                 Check(n == 1, $"AddBatchServers imported {link.Split('#')[0]} (returned {n})");
 
-                var expectedType = link.StartsWith("naive") ? EConfigType.Naive : EConfigType.AnyTLS;
+                var expectedType = link.StartsWith("masque") ? EConfigType.MASQUE
+                    : link.StartsWith("naive") ? EConfigType.Naive : EConfigType.AnyTLS;
                 var added = config.vmess.FirstOrDefault();
                 Check(added != null, "  server landed in config.vmess");
                 Check(added != null && added.configType == expectedType, "  with the right config type");
@@ -210,6 +277,7 @@ namespace SingboxConfigCheck
                 ("tuic://h.example.com:443?uuid=u&password=pw#T1", EConfigType.TUIC),
                 ("anytls://h.example.com:443#A1", EConfigType.AnyTLS),
                 ("naive+https://h.example.com:443#N1", EConfigType.Naive),
+                ("masque://u:pw@h.example.com:443#Q1", EConfigType.MASQUE),
             })
             {
                 var c = new Config { vmess = new List<VmessItem>(), subItem = new List<SubItem>() };

@@ -31,7 +31,17 @@ namespace v2rayN.Handler
         /// so far.
         /// </summary>
         public static bool IsSingboxOnly(EConfigType configType)
-            => configType == EConfigType.AnyTLS || configType == EConfigType.Naive;
+            => configType == EConfigType.AnyTLS
+            || configType == EConfigType.Naive
+            || configType == EConfigType.MASQUE;
+
+        /// <summary>
+        /// Protocols that sing-box models as an <c>endpoints</c> entry rather than an
+        /// outbound. MASQUE is the only one: it registers via
+        /// masque.RegisterEndpoint and is typed "masque-client".
+        /// </summary>
+        public static bool IsEndpointType(EConfigType configType)
+            => configType == EConfigType.MASQUE;
 
         /// <summary>
         /// Build a complete sing-box configuration for a single server.
@@ -60,9 +70,14 @@ namespace v2rayN.Handler
                     ["listen_port"] = localPort,
                 };
 
+                // MASQUE is an endpoint, so the "proxy" is a direct outbound that a
+                // route rule sends QUIC traffic through the endpoint.
+                var viaEndpoint = IsEndpointType(item.configType);
                 var outbounds = new JObject
                 {
-                    ["proxy"] = GenOutbound(item),
+                    ["proxy"] = viaEndpoint
+                        ? new JObject { ["type"] = "direct", ["tag"] = "proxy" }
+                        : GenOutbound(item),
                     ["direct"] = new JObject { ["type"] = "direct", ["tag"] = "direct" },
                 };
 
@@ -70,12 +85,22 @@ namespace v2rayN.Handler
                 // core, so behaviour does not change when a server is switched to
                 // sing-box. Keeps the generated config minimal rather than
                 // reproducing sing-box's full default DNS/rule set.
+                var rules = new JArray
+                {
+                    new JObject { ["outbound"] = "direct", ["network"] = "udp" },
+                };
+                if (viaEndpoint)
+                {
+                    // An endpoint is only reachable through a route rule.
+                    rules.Add(new JObject
+                    {
+                        ["network"] = "quic",
+                        ["outbound"] = "proxy-endpoint",
+                    });
+                }
                 var route = new JObject
                 {
-                    ["rules"] = new JArray
-                    {
-                        new JObject { ["outbound"] = "direct", ["network"] = "udp" },
-                    },
+                    ["rules"] = rules,
                     ["final"] = "proxy",
                 };
 
@@ -87,6 +112,11 @@ namespace v2rayN.Handler
                     ["route"] = route,
                 };
 
+                if (viaEndpoint)
+                {
+                    config["endpoints"] = new JArray { GenEndpoint(item) };
+                }
+
                 result = config.ToString(Formatting.Indented);
                 return 0;
             }
@@ -95,6 +125,71 @@ namespace v2rayN.Handler
                 Utils.SaveLog(_tag, ex);
                 result = null;
                 return -1;
+            }
+        }
+
+        /// <summary>
+        /// The <c>endpoints</c> entry for protocols sing-box models as an endpoint.
+        /// Shape follows 7.x's FillEndpoint for EConfigType.MASQUE.
+        /// </summary>
+        public static JObject GenEndpoint(VmessItem item)
+        {
+            var endpoint = new JObject
+            {
+                ["type"] = "masque-client",
+                ["tag"] = "proxy-endpoint",
+                ["server"] = item.address,
+                ["server_port"] = item.port,
+            };
+
+            // Same convention as naive: the whole userinfo is kept in `id` and split
+            // here, so the shared flat model needs no username field.
+            SplitCredential(item.id, out var user, out var pass);
+            if (user != null)
+            {
+                endpoint["username"] = user;
+            }
+            if (pass != null)
+            {
+                endpoint["password"] = pass;
+            }
+
+            if (!string.IsNullOrEmpty(item.path))
+            {
+                endpoint["path"] = item.path;
+            }
+
+            var tls = GenTls(item);
+            if (tls != null)
+            {
+                endpoint["tls"] = tls;
+            }
+
+            return endpoint;
+        }
+
+        /// <summary>
+        /// "user:pass" or just "pass", matching 7.x's NaiveFmt/MasqueFmt: a colon
+        /// means the first half is the username, otherwise the whole thing is the
+        /// password.
+        /// </summary>
+        private static void SplitCredential(string raw, out string? user, out string? pass)
+        {
+            user = null;
+            pass = null;
+            if (string.IsNullOrEmpty(raw))
+            {
+                return;
+            }
+            var colon = raw.IndexOf(':');
+            if (colon >= 0)
+            {
+                user = raw.Substring(0, colon);
+                pass = raw.Substring(colon + 1);
+            }
+            else
+            {
+                pass = raw;
             }
         }
 
@@ -128,15 +223,14 @@ namespace v2rayN.Handler
             {
                 if (item.configType == EConfigType.Naive)
                 {
-                    var colon = item.id.IndexOf(':');
-                    if (colon >= 0)
+                    SplitCredential(item.id, out var nu, out var np);
+                    if (nu != null)
                     {
-                        outbound["username"] = item.id.Substring(0, colon);
-                        outbound["password"] = item.id.Substring(colon + 1);
+                        outbound["username"] = nu;
                     }
-                    else
+                    if (np != null)
                     {
-                        outbound["password"] = item.id;
+                        outbound["password"] = np;
                     }
                 }
                 else

@@ -193,6 +193,7 @@ namespace v2rayN
         // variant and imports both.
         public const string naiveProtocol = "naive+https://";
         public const string naiveQuicProtocol = "naive+quic://";
+        public const string masqueProtocol = "masque://";
         /// <summary>
         /// hysteria2
         /// </summary>

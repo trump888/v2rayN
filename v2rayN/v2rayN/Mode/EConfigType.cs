@@ -24,6 +24,11 @@ namespace v2rayN.Mode
         AnyTLS = 12,
         // 13 is unused in this build. 7.x uses 12 for Naive, but 12 is AnyTLS
         // here; same reasoning as AnyTLS = 12 not being 11.
-        Naive = 13
+        Naive = 13,
+        // 14 matches 7.x. MASQUE is real, but note it is not in any *released*
+        // sing-box: it landed in sing-box master (commit e22cd5406, 2026-09-21)
+        // and is still 45 commits ahead of v1.14.2. It registers as an *endpoint*
+        // ("masque-client"), not an outbound.
+        MASQUE = 14
     }
 }

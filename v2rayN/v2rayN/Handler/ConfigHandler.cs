@@ -988,7 +988,8 @@ namespace v2rayN.Handler
                       || vmessItem.configType == EConfigType.Mieru
                       || vmessItem.configType == EConfigType.TUIC
                       || vmessItem.configType == EConfigType.AnyTLS
-                      || vmessItem.configType == EConfigType.Naive)
+                      || vmessItem.configType == EConfigType.Naive
+                      || vmessItem.configType == EConfigType.MASQUE)
                 {
                     if (AddTypedServer(ref config, vmessItem, vmessItem.configType, false) == 0)
                     {
