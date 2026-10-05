@@ -596,7 +596,8 @@ namespace v2rayN.Handler
                         return null;
                     }
                 }
-                else if (result.StartsWith(Global.naiveProtocol) || result.StartsWith(Global.naiveQuicProtocol))
+                else if (result.StartsWith(Global.naiveProtocol, StringComparison.OrdinalIgnoreCase)
+                      || result.StartsWith(Global.naiveQuicProtocol, StringComparison.OrdinalIgnoreCase))
                 {
                     Utils.SaveLog($"Try parse naive: {result.Substring(0, Math.Min(100, result.Length))}");
                     vmessItem = ResolveNaive(result);
@@ -606,7 +607,7 @@ namespace v2rayN.Handler
                         return null;
                     }
                 }
-                else if (result.StartsWith(Global.anytlsProtocol))
+                else if (result.StartsWith(Global.anytlsProtocol, StringComparison.OrdinalIgnoreCase))
                 {
                     Utils.SaveLog($"Try parse anytls: {result.Substring(0, Math.Min(100, result.Length))}");
                     vmessItem = ResolveAnyTLS(result);

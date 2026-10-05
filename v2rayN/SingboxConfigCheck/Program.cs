@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using v2rayN;
 using v2rayN.Handler;
 using v2rayN.Mode;
@@ -51,6 +52,10 @@ namespace SingboxConfigCheck
             RoundTrip(outDir);
 
             NaiveRoundTrip(outDir);
+
+            Console.WriteLine();
+            Console.WriteLine("== full UI clipboard path ==");
+            ClipboardPath(outDir);
 
             Console.WriteLine();
             Console.WriteLine("== routing ==");
@@ -157,6 +162,55 @@ namespace SingboxConfigCheck
             Check(rc2 == 0, "GenerateClientConfig still succeeds for VMess");
             Check(v2rayContent.Contains("\"outbounds\"") && !v2rayContent.Contains("\"anytls\""),
                   "VMess still generates v2ray JSON");
+        }
+
+        /// <summary>
+        /// The path the UI actually takes. MainForm reads the clipboard and calls
+        /// ConfigHandler.AddBatchServers, which splits on newlines, routes
+        /// subscription-looking data, calls ShareHandler, and falls back through
+        /// base64 / SIP008 / custom. Testing ShareHandler directly skips all of
+        /// that -- and a link that imports fine in isolation can still fail here.
+        /// </summary>
+        private static void ClipboardPath(string outDir)
+        {
+            foreach (var link in new[]
+            {
+                "anytls://pw@example.com:443#UI1",
+                "anytls://u:pw@example.com:443?sni=s.example&insecure=1#UI2",
+                "naive+https://pw@example.com:443#UI3",
+            })
+            {
+                var config = new Config { vmess = new List<VmessItem>(), subItem = new List<SubItem>() };
+                var n = ConfigHandler.AddBatchServers(ref config, link, "", "group1");
+                Check(n == 1, $"AddBatchServers imported {link.Split('#')[0]} (returned {n})");
+
+                var expectedType = link.StartsWith("naive") ? EConfigType.Naive : EConfigType.AnyTLS;
+                var added = config.vmess.FirstOrDefault();
+                Check(added != null, "  server landed in config.vmess");
+                Check(added != null && added.configType == expectedType, "  with the right config type");
+                Check(added != null && added.groupId == "group1", "  and the right group");
+
+                // And it must generate a usable config straight after import.
+                if (added != null)
+                {
+                    var f = Path.Combine(outDir, "ui-" + added.configType + ".json");
+                    var rc = V2rayConfigHandler.GenerateClientConfig(added, f, out var m, out _);
+                    Check(rc == 0, $"  and generates a config immediately (msg: {m})");
+                }
+            }
+
+            // A whole subscription payload: many links, newline separated. This is
+            // what a real subscription paste looks like.
+            var bulk = string.Join(Environment.NewLine, new[]
+            {
+                "anytls://a1@h1.example.com:443#A",
+                "anytls://a2@h2.example.com:443#B",
+                "naive+https://a3@h3.example.com:443#C",
+            });
+            var bulkCfg = new Config { vmess = new List<VmessItem>(), subItem = new List<SubItem>() };
+            var bulkN = ConfigHandler.AddBatchServers(ref bulkCfg, bulk, "", "g2");
+            Check(bulkN == 3, $"a 3-link subscription import returns 3 (got {bulkN})");
+            Check(bulkCfg.vmess.Count == 3, "and all three are stored");
         }
 
         /// <summary>
