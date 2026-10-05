@@ -732,6 +732,26 @@ namespace v2rayN.Mode
             set;
         }
         #endregion WireGuard
+
+        #region Reality
+        /// <summary>
+        /// Reality short id. Named as in 7.x and carried as "sid" in a share link.
+        /// Reused `publicKey` for the Reality public key ("pbk") rather than adding a
+        /// second field: 7.x has a single PublicKey used by both Reality and
+        /// WireGuard, and two fields meaning the same thing is how they drift.
+        /// </summary>
+        public string shortId
+        {
+            get;
+            set;
+        }
+        /// <summary>Reality spiderX, carried as "spx".</summary>
+        public string spiderX
+        {
+            get;
+            set;
+        }
+        #endregion Reality
 }
 
     [Serializable]

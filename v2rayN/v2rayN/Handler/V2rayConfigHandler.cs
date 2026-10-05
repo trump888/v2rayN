@@ -749,6 +749,35 @@ namespace v2rayN.Handler
                     streamSettings.tlsSettings = tlsSettings;
                 }
 
+                //if reality
+                // 5.39 had no Reality support at all, so a vless:// link carrying
+                // pbk/sid parsed without complaint and produced a config xray could
+                // not connect with -- a silent failure, which is the worst shape.
+                if (node.streamSecurity == Global.StreamSecurityReality)
+                {
+                    streamSettings.security = node.streamSecurity;
+
+                    var realityFingerprint = string.IsNullOrWhiteSpace(node.fingerprint)
+                        ? config.CoreBasicItem.defFingerprint
+                        : node.fingerprint;
+
+                    streamSettings.realitySettings = new RealitySettings
+                    {
+                        // Fall back to the configured default rather than emitting an
+                        // empty fingerprint; 7.x does the same.
+                        fingerprint = realityFingerprint,
+                        // serverName comes from sni, else the first requestHost entry,
+                        // matching what the tls branch above does.
+                        serverName = !string.IsNullOrWhiteSpace(sni)
+                            ? sni
+                            : (!string.IsNullOrWhiteSpace(host) ? Utils.String2List(host)[0] : node.address),
+                        publicKey = node.publicKey,
+                        shortId = node.shortId,
+                        spiderX = node.spiderX,
+                        show = false,
+                    };
+                }
+
                 //if xtls
                 if (node.streamSecurity == Global.StreamSecurityX)
                 {

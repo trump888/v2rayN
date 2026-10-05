@@ -32,6 +32,13 @@ namespace v2rayN.Forms
             {
                 cmbStreamSecurity.Items.Add(Global.StreamSecurityX);
             }
+            // Reality. VLESS is the protocol that uses it, and it is now the
+            // standard way to run VLESS, so it belongs in the list wherever xtls
+            // does -- reality replaces xtls, it is not an alternative to it.
+            if (AllowXtls)
+            {
+                cmbStreamSecurity.Items.Add(Global.StreamSecurityReality);
+            }
             cmbFingerprint.Items.AddRange(Global.fingerprints.ToArray());
         }
 

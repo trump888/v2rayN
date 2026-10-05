@@ -401,6 +401,11 @@ namespace v2rayN.Mode
         public TlsSettings tlsSettings { get; set; }
 
         /// <summary>
+        /// Reality 设置。5.39 没有这个字段，所以 Reality 配置根本无法生成。
+        /// </summary>
+        public RealitySettings realitySettings { get; set; }
+
+        /// <summary>
         /// Tcp传输额外设置
         /// </summary>
         public TcpSettings tcpSettings { get; set; }
@@ -431,6 +436,19 @@ namespace v2rayN.Mode
         /// </summary>
         public GrpcSettings grpcSettings { get; set; }
 
+    }
+
+    /// <summary>
+    /// Reality 设置，对应 Xray 的 realitySettings。
+    /// </summary>
+    public class RealitySettings
+    {
+        public string fingerprint { get; set; }
+        public string serverName { get; set; }
+        public string publicKey { get; set; }
+        public string shortId { get; set; }
+        public string spiderX { get; set; }
+        public bool show { get; set; }
     }
 
     public class TlsSettings

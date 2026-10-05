@@ -487,6 +487,20 @@ namespace v2rayN.Handler
             {
                 dicQuery.Add("certSha256", item.certSha256);
             }
+            // Reality. Parameter names match 7.x's BaseFmt so links move between
+            // builds. publicKey is shared with WireGuard, which is what 7.x does too.
+            if (!Utils.IsNullOrEmpty(item.publicKey))
+            {
+                dicQuery.Add("pbk", Utils.UrlEncode(item.publicKey));
+            }
+            if (!Utils.IsNullOrEmpty(item.shortId))
+            {
+                dicQuery.Add("sid", Utils.UrlEncode(item.shortId));
+            }
+            if (!Utils.IsNullOrEmpty(item.spiderX))
+            {
+                dicQuery.Add("spx", Utils.UrlEncode(item.spiderX));
+            }
             if (!Utils.IsNullOrEmpty(item.ech))
             {
                 dicQuery.Add("ech", item.ech);
@@ -1436,7 +1450,17 @@ namespace v2rayN.Handler
             item.sni = query["sni"] ?? "";
             item.alpn = Utils.String2List(Utils.UrlDecode(query["alpn"] ?? ""));
             item.network = query["type"] ?? "tcp";
-            item.fingerprint = query["fingerprint"] ?? "";
+            // 5.39 spells the fingerprint parameter "fingerprint"; 7.x and every
+            // other client spell it "fp". Accept both so links move either way,
+            // and keep writing 5.39's own spelling out.
+            item.fingerprint = query["fingerprint"] ?? query["fp"] ?? "";
+            // Reality. 7.x parses these in BaseFmt.ResolveUriQuery, shared by every
+            // protocol, which is where they belong -- not in the VLESS branch.
+            // Without them a vless:// Reality link parsed "successfully" and quietly
+            // produced a config xray cannot connect with.
+            item.publicKey = Utils.UrlDecode(query["pbk"] ?? "");
+            item.shortId = Utils.UrlDecode(query["sid"] ?? "");
+            item.spiderX = Utils.UrlDecode(query["spx"] ?? "");
             item.certSha256 = query["certSha256"] ?? "";
             item.ech = query["ech"] ?? "";
             if (query["insecure"] != null)

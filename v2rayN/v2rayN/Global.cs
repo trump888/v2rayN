@@ -137,6 +137,14 @@ namespace v2rayN
         /// </summary>
         public const string StreamSecurity = "tls";
         public const string StreamSecurityX = "xtls";
+        /// <summary>
+        /// Reality. Not present in 5.39 at all: no model fields, no share-link
+        /// parameters, nothing generated. It is the standard VLESS transport now
+        /// (xtls-rprx-vision), so a large share of real VLESS nodes could not be
+        /// used here -- and failed silently, because a link without pbk/sid parses
+        /// fine and simply produces a config xray cannot connect with.
+        /// </summary>
+        public const string StreamSecurityReality = "reality";
 
         public const string InboundSocks = "socks";
         public const string InboundHttp = "http";

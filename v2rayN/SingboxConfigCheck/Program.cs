@@ -68,6 +68,10 @@ namespace SingboxConfigCheck
             NaiveRoundTrip(outDir);
 
             Console.WriteLine();
+            Console.WriteLine("== reality ==");
+            Reality();
+
+            Console.WriteLine();
             Console.WriteLine("== wireguard ==");
             WireGuard(outDir);
 
@@ -192,6 +196,64 @@ namespace SingboxConfigCheck
             Check(rc2 == 0, "GenerateClientConfig still succeeds for VMess");
             Check(v2rayContent.Contains("\"outbounds\"") && !v2rayContent.Contains("\"anytls\""),
                   "VMess still generates v2ray JSON");
+        }
+
+        /// <summary>
+        /// Reality for VLESS. 5.39 had no support at all: no model fields, no
+        /// share-link parameters, nothing generated. A vless:// Reality link
+        /// therefore imported "successfully" and produced a config xray cannot
+        /// connect with -- the worst failure shape, because nothing complained.
+        /// </summary>
+        private static void Reality()
+        {
+            const string link =
+                "vless://11111111-2222-3333-4444-555555555555@vless.example.com:443" +
+                "?encryption=none&security=reality&sni=www.microsoft.com&fp=chrome" +
+                "&pbk=PUBKEYVALUE&sid=0123456789abcdef&spx=%2F&type=tcp&headerType=none#VLESS-Reality";
+
+            var item = ShareHandler.ImportFromClipboardConfig(link, out var msg);
+            Check(item != null, $"vless reality imports (msg: {msg})");
+            if (item == null) { return; }
+
+            Check(item.configType == EConfigType.VLESS, "type is VLESS");
+            Check(item.streamSecurity == "reality", $"security is reality (got '{item.streamSecurity}')");
+            Check(item.sni == "www.microsoft.com", $"sni (got '{item.sni}')");
+            // 5.39 spells it fingerprint, 7.x and every other client spell it fp.
+            // Accepting both is what makes links move between builds.
+            Check(item.fingerprint == "chrome", $"fingerprint accepted from the 'fp' parameter (got '{item.fingerprint}')");
+            Check(item.publicKey == "PUBKEYVALUE", $"pbk parsed (got '{item.publicKey}')");
+            Check(item.shortId == "0123456789abcdef", $"sid parsed (got '{item.shortId}')");
+            Check(item.spiderX == "/", $"spx url-decoded (got '{item.spiderX}')");
+
+            var again = ShareHandler.ImportFromClipboardConfig(ShareHandler.GetShareUrl(item), out _);
+            Check(again != null && again.publicKey == item.publicKey && again.shortId == item.shortId
+                  && again.spiderX == item.spiderX && again.streamSecurity == "reality"
+                  && again.fingerprint == "chrome" && again.sni == item.sni,
+                  "reality survives an export/import cycle unchanged");
+
+            var cfg = new Config
+            {
+                inbound = new List<InItem>
+                {
+                    new InItem { protocol = Global.InboundSocks, localPort = 10808, udpEnabled = true, sniffingEnabled = true },
+                },
+            };
+            LazyConfig.Instance.SetConfig(ref cfg);
+            var file = Path.Combine(Path.GetTempPath(), "reality.json");
+            var rc = V2rayConfigHandler.GenerateClientConfig(item, file, out var genMsg, out _);
+            Check(rc == 0, $"reality config generates (msg: {genMsg})");
+            if (rc != 0 || !File.Exists(file)) { return; }
+
+            var json = File.ReadAllText(file);
+            Check(json.Contains("\"security\": \"reality\""), "streamSettings.security is reality");
+            Check(json.Contains("realitySettings"), "realitySettings present");
+            Check(json.Contains("\"publicKey\": \"PUBKEYVALUE\""), "reality publicKey emitted");
+            Check(json.Contains("\"shortId\": \"0123456789abcdef\""), "reality shortId emitted");
+            Check(json.Contains("\"spiderX\": \"/\""), "reality spiderX emitted");
+            Check(json.Contains("\"serverName\": \"www.microsoft.com\""), "reality serverName from sni");
+            Check(json.Contains("\"fingerprint\": \"chrome\""), "reality fingerprint emitted");
+            Check(json.Contains("\"show\": false"), "show is false, as 7.x sets it");
+            File.Delete(file);
         }
 
         /// <summary>
