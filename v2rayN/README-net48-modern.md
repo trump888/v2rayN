@@ -59,6 +59,28 @@ Now carried over:
   does not exist here.
 - **SkiaSharp trimming.** There is no SkiaSharp.
 
+## Known advisories in the dependency set
+
+CI reports **NU1902: log4net < 3.3.0**, GHSA-4f7c-pmjv-c25w (medium): silent
+log event loss in `XmlLayout` / `XmlLayoutSchemaLog4J` caused by unescaped XML 1.0
+forbidden characters.
+
+**Not applicable to this app**, and deliberately left visible rather than
+suppressed. `Tool/Logging.cs` configures a `PatternLayout`
+(`%date [%thread] %-5level %logger - %message%newline`) and never instantiates
+`XmlLayout` or `XmlLayoutSchemaLog4J`, which are the only affected code paths.
+
+This does **not** resolve the advisory, though, and it is worth being blunt about
+that: the entire log4net 2.x line is affected and the fix is 3.3.0+. Moving to
+log4net 3.x is a major version with breaking API changes (reworked
+`LoggingEvent` and target setup) and needs runtime testing this branch's CI cannot
+do — it compiles and asserts, but it cannot exercise a live log4net pipeline.
+
+An `InternalsVisibleTo`-style suppression was tried and removed: `NuGetAuditSuppress`
+is an SDK item that `nuget restore` does not understand (MSB4066), and
+suppressing a security finding without a mechanism that is honoured is worse than
+showing it.
+
 ## x86 and x64 are both shipped
 
 `Grpc.Core` ships its native transport per architecture under
