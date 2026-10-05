@@ -347,13 +347,31 @@ jobs:
           '35138b9a-5d96-4fbd-8e2d-a2440225f93a')) { # Windows 7
           if ($mf -notmatch $guid) { Write-Error "app.manifest is missing supportedOS $guid"; exit 1 }
         }
-        if ($mf -notmatch 'PerMonitorV2') { Write-Error "app.manifest does not request PerMonitorV2 DPI awareness"; exit 1 }
+        # PerMonitorV2 in the manifest without the matching app.config switch leaves
+        # WinForms unscaled: sharp, but drawn at 1/1.5 or 1/2 size on a scaled
+        # display. This is exactly the regression that shipped once, so the two are
+        # asserted to agree.
+        $mfDpi = $mf -match 'PerMonitorV2'
+        $appConfig = 'v2rayN/v2rayN/app.config'
+        $cfgDpi = (Test-Path $appConfig) -and ((Get-Content $appConfig -Raw) -match 'DpiAwareness')
+        Write-Host "  manifest PerMonitorV2: $mfDpi / app.config DpiAwareness: $cfgDpi"
+        if ($mfDpi -ne $cfgDpi) {
+          Write-Error "DPI awareness mismatch: app.manifest has PerMonitorV2=$mfDpi but app.config has DpiAwareness=$cfgDpi. They must agree or WinForms renders at the wrong size on a scaled display."
+          exit 1
+        }
 
         # And confirm it reached the binary, not just the project file.
         $exe = Get-ChildItem 'v2rayN/v2rayN/bin/Release' -Recurse -Filter 'v2rayN.exe' -File | Select-Object -First 1
         if (-not $exe) { throw "v2rayN.exe not built" }
         $bytes = [System.IO.File]::ReadAllBytes($exe.FullName)
         $text = [System.Text.Encoding]::ASCII.GetString($bytes)
+        $exeCfg = Join-Path $exe.DirectoryName 'v2rayN.exe.config'
+        if ($cfgDpi) {
+          if (-not (Test-Path $exeCfg)) { Write-Error "app.config exists but no v2rayN.exe.config was produced"; exit 1 }
+          $cfgText = Get-Content $exeCfg -Raw
+          if ($cfgText -notmatch 'DpiAwareness') { Write-Error "v2rayN.exe.config does not carry the DpiAwareness switch"; exit 1 }
+          Write-Host "  DpiAwareness present in v2rayN.exe.config"
+        }
         foreach ($needle in @('PerMonitorV2', '8e0f7a12-bfb3-4fe8-b9a5-48fd50a15a9a')) {
           $found = $text.Contains($needle)
           Write-Host ("  {0,-40} embedded in v2rayN.exe: {1}" -f $needle, $found)

@@ -188,6 +188,17 @@ namespace v2rayN
             // PerMonitorV2 comes from app.manifest. If the manifest were missing or
             // malformed the process would be DPI-unaware and the UI blurry on a
             // scaled display, which no headless CI check can see.
+            // The two halves of PerMonitorV2 must agree, or the UI renders at the
+            // wrong size on a scaled display. Report both.
+            var manifest = File.ReadAllText(Path.Combine(Utils.StartupPath(), "app.manifest"));
+            var exeConfig = Path.Combine(Utils.StartupPath(), "v2rayN.exe.config");
+            var manifestDpi = manifest.Contains("PerMonitorV2");
+            var configDpi = File.Exists(exeConfig) && File.ReadAllText(exeConfig).Contains("DpiAwareness");
+            Say($"  dpi manifest  {(manifestDpi ? "PerMonitorV2" : "none")}");
+            Say($"  dpi app.config{(configDpi ? " PerMonitorV2" : " none")}");
+            Check(manifestDpi == configDpi,
+                  "DPI awareness is consistent between app.manifest and v2rayN.exe.config");
+
             try
             {
                 using var g = System.Drawing.Graphics.FromHwnd(IntPtr.Zero);
