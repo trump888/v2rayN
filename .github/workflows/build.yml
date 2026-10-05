@@ -188,6 +188,12 @@ jobs:
     # as a 404 when a user tries to update that core.
     - name: Check core repositories and asset names
       shell: pwsh
+      # GITHUB_TOKEN is not exposed to a step unless mapped here. Without it this
+      # step's ~19 api.github.com calls are unauthenticated and run into the
+      # 60-per-hour-per-IP limit, which then shows up as every repository reporting
+      # 403 -- which the naive handling below reported as "GONE".
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         $ProgressPreference = 'SilentlyContinue'
         $globals = Get-Content v2rayN/v2rayN/Global.cs -Raw
@@ -196,6 +202,7 @@ jobs:
         $headers = @{ 'User-Agent' = 'v2rayN-net48-check' }
         if ($env:GITHUB_TOKEN) { $headers['Authorization'] = "Bearer $env:GITHUB_TOKEN" }
         $bad = 0
+        $rateLimited = $false
         foreach ($r in $repos) {
           try {
             $info = Invoke-RestMethod "https://api.github.com/repos/$r" -Headers $headers
@@ -204,8 +211,17 @@ jobs:
             if ($flag -ne 'ok') { $bad++ }
             Write-Host ("  {0,-8} {1,-34} last push {2}" -f $flag, $r, $pushed)
           } catch {
+            # A 403 is this step's own rate limit, not evidence about the repo.
+            # Reporting that as GONE would be a false signal -- the same mistake as
+            # reading a failed code search as "does not exist".
+            $msg = $_.Exception.Message
+            if ($msg -match '403|rate limit') {
+              Write-Warning "GitHub API rate limit hit while checking $r; skipping the rest of this check"
+              $rateLimited = $true
+              break
+            }
             $bad++
-            Write-Host ("  {0,-8} {1,-34} {2}" -f 'GONE', $r, $_.Exception.Message)
+            Write-Host ("  {0,-8} {1,-34} {2}" -f 'GONE', $r, $msg)
           }
         }
         if ($bad -gt 0) {
@@ -277,6 +293,10 @@ jobs:
           'ShadowsocksR-Live/overtls'  = 'overtls-x86_64-win7-windows-msvc.zip'
           'spongebob888/shadowquic'    = 'shadowquic-x86_64-windows.exe'
           'MetaCubeX/mihomo'           = 'mihomo-windows-amd64'
+        }
+        if ($rateLimited) {
+          Write-Warning "skipping the asset-name check: the API rate limit was hit"
+          return
         }
         foreach ($r in $expectAssets.Keys) {
           try {
