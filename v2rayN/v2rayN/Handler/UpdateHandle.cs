@@ -186,58 +186,70 @@ namespace v2rayN.Handler
 
                 foreach (var item in config.subItem)
                 {
-                    if (item.enabled == false)
+                    // 7.x wraps each subscription in its own try/catch. Without it, one
+                    // malformed or unreachable subscription throws out of the whole loop and
+                    // every subscription after it silently never updates. Reported per item
+                    // so the failure is visible and the rest still run.
+                    try
                     {
-                        continue;
-                    }
-                    if (!Utils.IsNullOrEmpty(groupId) && item.groupId != groupId)
-                    {
-                        continue;
-                    }
-
-                    string id = item.id.TrimEx();
-                    string url = item.url.TrimEx();
-                    string userAgent = item.userAgent.TrimEx();
-                    //string groupId = item.groupId.TrimEx();
-                    string hashCode = $"{item.remarks}->";
-                    if (Utils.IsNullOrEmpty(id) || Utils.IsNullOrEmpty(url))
-                    {
-                        //_updateFunc(false, $"{hashCode}{ResUI.MsgNoValidSubscription}");
-                        continue;
-                    }
-
-                    var downloadHandle = new DownloadHandle();
-                    downloadHandle.Error += (sender2, args) =>
-                    {
-                        _updateFunc(false, $"{hashCode}{args.GetException().Message}");
-                    };
-
-                    _updateFunc(false, $"{hashCode}{ResUI.MsgStartGettingSubscriptions}");
-                    var result = await downloadHandle.DownloadStringAsync(url, blProxy, userAgent);
-                    if (blProxy && Utils.IsNullOrEmpty(result))
-                    {
-                        result = await downloadHandle.DownloadStringAsync(url, false, userAgent);
-                    }
-
-                    if (Utils.IsNullOrEmpty(result))
-                    {
-                        _updateFunc(false, $"{hashCode}{ResUI.MsgSubscriptionDecodingFailed}");
-                    }
-                    else
-                    {
-                        _updateFunc(false, $"{hashCode}{ResUI.MsgGetSubscriptionSuccessfully}");
-                        if (result.Length < 99)
+                        if (item.enabled == false)
                         {
-                            _updateFunc(false, $"{hashCode}{result}");
+                            continue;
+                        }
+                        if (!Utils.IsNullOrEmpty(groupId) && item.groupId != groupId)
+                        {
+                            continue;
                         }
 
-                        int ret = ConfigHandler.AddBatchServers(ref config, result, id, item.groupId.TrimEx());
-                        _updateFunc(false,
-                            ret > 0
-                                ? $"{hashCode}{ResUI.MsgUpdateSubscriptionEnd}"
-                                : $"{hashCode}{ResUI.MsgFailedImportSubscription}");
+                        string id = item.id.TrimEx();
+                        string url = item.url.TrimEx();
+                        string userAgent = item.userAgent.TrimEx();
+                        //string groupId = item.groupId.TrimEx();
+                        string hashCode = $"{item.remarks}->";
+                        if (Utils.IsNullOrEmpty(id) || Utils.IsNullOrEmpty(url))
+                        {
+                            //_updateFunc(false, $"{hashCode}{ResUI.MsgNoValidSubscription}");
+                            continue;
+                        }
+
+                        var downloadHandle = new DownloadHandle();
+                        downloadHandle.Error += (sender2, args) =>
+                        {
+                            _updateFunc(false, $"{hashCode}{args.GetException().Message}");
+                        };
+
+                        _updateFunc(false, $"{hashCode}{ResUI.MsgStartGettingSubscriptions}");
+                        var result = await downloadHandle.DownloadStringAsync(url, blProxy, userAgent);
+                        if (blProxy && Utils.IsNullOrEmpty(result))
+                        {
+                            result = await downloadHandle.DownloadStringAsync(url, false, userAgent);
+                        }
+
+                        if (Utils.IsNullOrEmpty(result))
+                        {
+                            _updateFunc(false, $"{hashCode}{ResUI.MsgSubscriptionDecodingFailed}");
+                        }
+                        else
+                        {
+                            _updateFunc(false, $"{hashCode}{ResUI.MsgGetSubscriptionSuccessfully}");
+                            if (result.Length < 99)
+                            {
+                                _updateFunc(false, $"{hashCode}{result}");
+                            }
+
+                            int ret = ConfigHandler.AddBatchServers(ref config, result, id, item.groupId.TrimEx());
+                            _updateFunc(false,
+                                ret > 0
+                                    ? $"{hashCode}{ResUI.MsgUpdateSubscriptionEnd}"
+                                    : $"{hashCode}{ResUI.MsgFailedImportSubscription}");
+                        }
+                        _updateFunc(false, "-------------------------------------------------------");
                     }
-                    _updateFunc(false, "-------------------------------------------------------");
+                    catch (Exception ex)
+                    {
+                        Utils.SaveLog("UpdateSubscription", ex);
+                        _updateFunc(false, $"{item.remarks}->" + ex.Message);
+                    }
                 }
                 //restore system proxy
                 if (bSysProxyType)
