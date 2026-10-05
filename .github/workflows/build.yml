@@ -714,6 +714,57 @@ jobs:
         if ($runFailures -gt 0) { throw "$runFailures configurations did not run" }
         Write-Host "all $($sbAll.Count) configurations ran and bound their inbound"
 
+        # --- 3. the executables themselves must start --------------------------
+        # Everything above exercises this build's own code. This starts the real
+        # programs: a tray application that cannot survive its own startup -- an
+        # unhandled exception in MainForm's constructor, a resource that fails to
+        # load, a first-run dialog that throws -- would pass every other check here,
+        # because none of them run the app.
+        #
+        # Application.StartupPath is the executable's own directory, so the app
+        # writing guiConfigs there is the signal that it got past initialization
+        # rather than dying on the way in.
+        foreach ($exeName in @('v2rayN.exe', 'v2rayUpgrade.exe')) {
+          $app = Get-ChildItem 'v2rayN' -Recurse -Filter $exeName -File |
+                  Where-Object { $_.FullName -match '[\\/]Release[\\/]' } |
+                  Select-Object -First 1
+          if (-not $app) {
+            Write-Error "$exeName was not produced by the build"
+            continue
+          }
+
+          $dir = $app.DirectoryName
+          $log = Join-Path $env:RUNNER_TEMP "$exeName.log"
+          $p = Start-Process -FilePath $app.FullName -PassThru -WindowStyle Hidden `
+               -RedirectStandardOutput $log -RedirectStandardError (Join-Path $env:RUNNER_TEMP "$exeName.err.log")
+          $alive = $false
+          try {
+            Start-Sleep -Seconds 8
+            $alive = -not $p.HasExited
+            if (-not $alive) {
+              Write-Host "  FAILED  $exeName exited during startup with code $($p.ExitCode)"
+              foreach ($lf in @($log, (Join-Path $env:RUNNER_TEMP "$exeName.err.log"))) {
+                if (Test-Path $lf) { Get-Content $lf -TotalCount 12 | ForEach-Object { Write-Host "      \$_" } }
+              }
+              # The app logs through log4net into guiLogs, which is far more
+              # informative than stdout.
+              $guiLog = Get-ChildItem (Join-Path $dir 'guiLogs') -Filter *.txt -File -ErrorAction SilentlyContinue |
+                        Sort-Object LastWriteTime -Descending | Select-Object -First 1
+              if ($guiLog) {
+                Write-Host "      --- guiLogs --- "
+                Get-Content $guiLog.FullName -Tail 12 | ForEach-Object { Write-Host "      \$_" }
+              }
+            } else {
+              $made = Test-Path (Join-Path $dir 'guiConfigs')
+              Write-Host ("  started {0,-20} alive after 8s, wrote guiConfigs: {1}" -f $exeName, $made)
+            }
+          } finally {
+            if (-not $p.HasExited) { $p.Kill(); [void]$p.WaitForExit(10000) }
+          }
+          if (-not $alive) { $runFailures++ }
+        }
+        if ($runFailures -gt 0) { throw "$runFailures runtime checks failed" }
+
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
