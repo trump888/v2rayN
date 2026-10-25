@@ -11,7 +11,6 @@ name: build net48 (Win7/Win10 lightweight)
 #   - push to master       : build + upload artifact (no release)
 #   - workflow_dispatch    : manual trigger; if `release_tag` is provided,
 #                            also creates a GitHub Release with the zip
-#   - schedule             : nightly build at 02:00 UTC to catch upstream
 # =============================================================================
 
 on:
@@ -37,8 +36,6 @@ on:
         required: false
         type: string
         default: '7.24.4'
-  schedule:
-    - cron: '0 2 * * *'   # nightly at 02:00 UTC
 
 permissions:
   contents: write
